@@ -10,6 +10,7 @@ import os
 import sys
 import argparse
 import logging
+import subprocess
 from pathlib import Path
 from dotenv import load_dotenv
 from notion_writer import NotionWriter
@@ -27,6 +28,7 @@ def get_page_id():
     parser.add_argument('--page', help='Notion page ID (alternative to positional argument)')
     parser.add_argument('--emoji', default='❓', help='Emoji to search for (default: ❓)')
     parser.add_argument('--dry-run', action='store_true', help='Show what would be changed without making changes')
+    parser.add_argument('--refresh-cache', action='store_true', help='Refresh the page cache before testing')
     
     args = parser.parse_args()
     
@@ -42,7 +44,7 @@ def get_page_id():
             logging.error("❌ No page ID provided")
             sys.exit(1)
     
-    return page_id, args.emoji, args.dry_run
+    return page_id, args.emoji, args.dry_run, args.refresh_cache
 
 def test_word_reversal_logic():
     """Test the word reversal logic with sample text"""
@@ -67,6 +69,59 @@ def test_word_reversal_logic():
     
     return True
 
+def refresh_page_cache(page_id):
+    """Refresh the page cache by running the notion scraper"""
+    try:
+        logging.info(f"🔄 Refreshing cache for page {page_id}...")
+        
+        # Run the notion scraper to refresh the cache
+        result = subprocess.run(
+            [sys.executable, "notion_scraper.py", page_id],
+            capture_output=True,
+            text=True,
+            encoding='utf-8',
+            errors='ignore',
+            cwd=os.getcwd()
+        )
+        
+        if result.returncode == 0:
+            logging.info("✅ Cache refreshed successfully!")
+            return True
+        else:
+            logging.error(f"❌ Failed to refresh cache: {result.stderr}")
+            return False
+            
+    except Exception as e:
+        logging.error(f"❌ Error refreshing cache: {e}")
+        return False
+
+def check_and_refresh_cache(page_id, force_refresh=False):
+    """Check if cache needs refreshing and prompt user if needed"""
+    from pathlib import Path
+    saved_pages_dir = Path("saved_pages")
+    debug_file = saved_pages_dir / f"notion_page_{page_id}_debug.json"
+    
+    # If cache doesn't exist, we must refresh
+    if not debug_file.exists():
+        logging.info(f"📂 No cached data found for page {page_id}")
+        logging.info("🔄 Cache refresh is required...")
+        return refresh_page_cache(page_id)
+    
+    # If force refresh is requested, do it
+    if force_refresh:
+        return refresh_page_cache(page_id)
+    
+    # Otherwise, prompt user
+    print(f"\n🗂️ Found cached data for page {page_id}")
+    print("❓ Do you want to refresh the cache to get the latest data? (y/N): ", end="")
+    response = input().strip().lower()
+    
+    if response == 'y':
+        return refresh_page_cache(page_id)
+    else:
+        logging.info("📋 Using existing cached data")
+        return True
+
 def test_notion_page_reversal(page_id, emoji="❓", dry_run=False):
     """Test the full Notion page word reversal functionality"""
     logging.info(f"🔍 Testing word reversal on page {page_id}")
@@ -78,18 +133,6 @@ def test_notion_page_reversal(page_id, emoji="❓", dry_run=False):
     try:
         # Initialize writer
         writer = NotionWriter()
-        
-        # Check if cached data is available
-        from pathlib import Path
-        saved_pages_dir = Path("saved_pages")
-        debug_file = saved_pages_dir / f"notion_page_{page_id}_debug.json"
-        
-        if debug_file.exists():
-            logging.info(f"🗂️ Found cached data at {debug_file}")
-            logging.info("⚡ This will be much faster than making API calls!")
-        else:
-            logging.info("📡 No cached data found, will need to make API calls")
-            logging.info("💡 Consider running the scraper first: python notion_scraper.py {page_id}")
         
         # First, just find the blocks to see what we're working with
         logging.info("📋 Finding blocks that start with the emoji...")
@@ -158,7 +201,14 @@ def main():
     logging.info("🚀 Starting Notion Word Reversal Test...")
     
     # Get parameters
-    page_id, emoji, dry_run = get_page_id()
+    page_id, emoji, dry_run, refresh_cache = get_page_id()
+    
+    # Check and refresh cache if needed
+    cache_ready = check_and_refresh_cache(page_id, force_refresh=refresh_cache)
+    
+    if not cache_ready:
+        logging.error("❌ Failed to prepare cache")
+        sys.exit(1)
     
     # Test the word reversal logic first
     logic_test_passed = test_word_reversal_logic()
