@@ -1,0 +1,81 @@
+
+# Reading:
+    prompt = f"""You are an expert in making technical and educational content more accessible to non-native English speakers who have an 8th-grade education level.
+
+Please directly edit and improve the following markdown content to make it easier to understand for someone whose English is their 2nd, 3rd, or 4th language. Edit the text in place, do not use curly brackets or any other markers for suggestions—just make the changes directly.
+
+IMPORTANT GUIDELINES:
+1. DO NOT change key terms, especially single terms on bullet point lines
+2. DO NOT change technical terms that are essential to the content
+3. DO NOT change proper nouns, names, or specific terminology
+4. Edit the main body content directly, making it more readable and accessible
+5. Focus on:
+   - Simplifying complex sentence structures
+   - Using shorter, clearer sentences
+   - Replacing difficult words with simpler alternatives
+   - Adding clarifying phrases where needed
+   - Making instructions more step-by-step
+   - Using active voice instead of passive voice
+
+Here's the content to enhance:
+
+{content}
+
+Please return the improved content, keeping the original markdown formatting intact."""
+
+# Culture:
+
+   prompt = f"""You are an expert in cross-cultural communication and educational activities. You have deep knowledge of cultural sensitivities, communication styles, and learning preferences across different regions of the world.
+
+Please analyze the following educational content and provide detailed feedback on the cultural appropriateness of the activities described. Focus on identifying where activities would work well and where they might face challenges in different cultural contexts.
+
+ANALYSIS REQUIREMENTS:
+
+1. **Activity Identification**: Identify all activities, exercises, and interactive elements in the content.
+
+2. **Cultural Region Analysis**: For each activity, analyze its suitability for:
+   - East Asia (China, Japan, Korea, etc.)
+   - South Asia (India, Pakistan, Bangladesh, etc.)
+   - Southeast Asia (Thailand, Vietnam, Indonesia, etc.)
+   - Middle East & North Africa
+   - Sub-Saharan Africa (or other regions of Africa with similar cultural contexts)
+   - Latin America & Caribbean
+   - Eastern Europe
+   - Western Europe & North America
+   - Pacific Islands
+   - other unique cultural contexts
+
+3. **Cultural Factors to Consider**:
+   - Communication styles (direct vs. indirect)
+   - Power distance and authority relationships
+   - Individualism vs. collectivism
+   - Gender roles and expectations
+   - Religious and spiritual considerations
+   - Educational traditions and preferences
+   - Physical contact and personal space
+   - Time orientation and scheduling
+   - Group dynamics and social hierarchies
+   - etc
+
+4. **For Each Activity, Provide**:
+   - **Where it would work well** and why
+   - **Where it might face challenges** and specific reasons why
+   - **Alternative activities** for regions where the original might not work well
+   - **Cultural adaptations** that could make it more suitable (outline entire activity with new instructions)
+
+5. **Format Your Response**:
+   Use clear markdown formatting with:
+   - Headers for each activity
+   - Bullet points for regions and feedback
+   - Clear explanations of cultural reasoning
+   - Specific, actionable alternative suggestions
+
+Here's the content to analyze:
+
+{content}
+
+Please provide a comprehensive cultural analysis that would help facilitators understand how to adapt these activities for different cultural contexts."""
+
+
+# Notes:
+Claude's grade level prompt: Your task is to take the text provided and rewrite it in a way that is easy for young learners in grades 3-5 to read and understand. Simplify advanced vocabulary, break down long sentences, explain difficult concepts in plain language, and present the information in a clear, engaging way. The short rewritten text should convey the core ideas of the original text in an age-appropriate manner.
