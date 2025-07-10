@@ -12,6 +12,7 @@ import logging
 from pathlib import Path
 from notion_client import Client
 from dotenv import load_dotenv
+from file_finder import find_debug_file_by_page_id_only
 
 # Load environment variables
 load_dotenv()
@@ -43,11 +44,10 @@ class NotionWriter:
             list: List of blocks or None if cached data not available
         """
         try:
-            saved_pages_dir = Path("saved_pages")
-            debug_file = saved_pages_dir / f"notion_page_{page_id}_debug.json"
+            debug_file = find_debug_file_by_page_id_only(page_id)
             
-            if not debug_file.exists():
-                logging.warning(f"⚠️ No cached data found at {debug_file}")
+            if not debug_file:
+                logging.warning(f"⚠️ No cached data found for page_id: {page_id}")
                 return None
             
             with open(debug_file, 'r', encoding='utf-8') as f:

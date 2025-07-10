@@ -24,46 +24,35 @@ Here's the content to enhance:
 Please return the improved content, keeping the original markdown formatting intact."""
 
 # Trainer Questions:
-    prompt = f"""You are an expert trainer and instructional designer. Based on the following training content, create two distinct sets of evaluation questions for trainers to use with non-native English speakers who may be inexperienced in the training topics.
+   prompt = f"""
+You are an expert trainer and instructional designer.  
+Based on the TRAINING CONTENT below, create **one** set of evaluation questions that can be used both **before** and **after** the training.
 
-TRAINING CONTENT:
+TRAINING CONTENT:
 {content}
 
-Please generate exactly two sets of questions in markdown format. Make questions clear and accessible for someone whose English is their 2nd, 3rd, or 4th language. Use shorter, clearer sentences and simpler vocabulary while maintaining professional quality.
+### PURPOSE  
+- **Before training:** reveal knowledge gaps, prior experience, and misconceptions.  
+- **After training:** check comprehension, ability to apply concepts, and depth of understanding.
 
-## Pre-Training Assessment Questions
+### QUESTION DESIGN GUIDELINES  
+1. **Quantity** – Write **10 – 12** questions.  
+2. **Type** – Use only open‑ended or scenario‑based questions.  
+3. **Focus** – Favor **“Why…?” “How…?” “Explain…”** or realistic situations.  
+4. **No yes/no or simple “What…?” questions.**  
+5. **Language** – Short sentences, simple vocabulary, clear professional tone; suitable for learners whose first language is not English.  
+6. **Diagnostics & Application** – Each question should prompt learners to articulate reasoning, processes, or problem‑solving steps.  
+7. **Markdown Format** – Number each question (1., 2., 3., etc.).  Do **not** add extra commentary or headings; output only the questions.
 
-Generate 8-12 questions that trainers can use BEFORE conducting the training to:
-- Assess trainees' current knowledge level
-- Identify specific gaps in understanding
-- Determine which parts of the training are most relevant for the group
-- Help customize the training approach based on needs
-- Understand trainees' prior experience and background
+### OUTPUT EXAMPLE (structure only)
+1. Why is it important to…  
+2. A team faces ____. How would you…  
+3. Explain how…  
+...
 
-These questions should be diagnostic and help trainers understand what their trainees already know and what they need to focus on.
+Return **only** the numbered question list in markdown.
+"""
 
-## Post-Training Evaluation Questions
-
-Generate 8-12 questions that trainers can use AFTER completing the training to:
-- Test comprehension and retention of key concepts
-- Evaluate practical application ability
-- Assess whether learning objectives were met
-- Identify areas that may need reinforcement
-- Measure the effectiveness of the training delivery
-
-These questions should be assessment-focused and help trainers determine if the training was successful.
-
-FORMATTING REQUIREMENTS:
-- Use clear, concise markdown formatting
-- Number each question (1., 2., 3., etc.)
-- Make questions practical and actionable for trainers
-- Use simple, direct language - avoid complex sentence structures
-- Replace difficult words with simpler alternatives when possible
-- Include a mix of question types (open-ended, scenario-based, knowledge checks)
-- Ensure questions are directly relevant to the training content provided
-- Do not include any commentary or explanations, just the question sets
-
-Return only the two question sets in the specified markdown format."""
 
 # Culture:
 

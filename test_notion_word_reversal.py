@@ -14,6 +14,7 @@ import subprocess
 from pathlib import Path
 from dotenv import load_dotenv
 from notion_writer import NotionWriter
+from file_finder import find_debug_file_by_page_id_only
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -97,12 +98,10 @@ def refresh_page_cache(page_id):
 
 def check_and_refresh_cache(page_id, force_refresh=False):
     """Check if cache needs refreshing and prompt user if needed"""
-    from pathlib import Path
-    saved_pages_dir = Path("saved_pages")
-    debug_file = saved_pages_dir / f"notion_page_{page_id}_debug.json"
+    debug_file = find_debug_file_by_page_id_only(page_id)
     
     # If cache doesn't exist, we must refresh
-    if not debug_file.exists():
+    if not debug_file:
         logging.info(f"📂 No cached data found for page {page_id}")
         logging.info("🔄 Cache refresh is required...")
         return refresh_page_cache(page_id)

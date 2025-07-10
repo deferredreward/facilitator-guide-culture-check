@@ -2,6 +2,7 @@ import os
 import json
 import sys
 import argparse
+import re
 from notion_client import Client
 from dotenv import load_dotenv
 import logging
@@ -11,6 +12,31 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 # Load environment variables
 load_dotenv()
+
+def clean_title_for_filename(title):
+    """Clean title to make it safe for use as a filename"""
+    if not title or not title.strip():
+        return "notion_page"
+    
+    # Remove or replace invalid filename characters
+    # Replace with underscores: spaces, slashes, backslashes, colons, etc.
+    cleaned = re.sub(r'[<>:"/\\|?*\s]+', '_', title.strip())
+    
+    # Replace multiple underscores with single underscore
+    cleaned = re.sub(r'_+', '_', cleaned)
+    
+    # Remove leading/trailing underscores
+    cleaned = cleaned.strip('_')
+    
+    # Limit length to avoid overly long filenames (keep reasonable length)
+    if len(cleaned) > 50:
+        cleaned = cleaned[:50].rstrip('_')
+    
+    # If cleaning results in empty string, use default
+    if not cleaned:
+        return "notion_page"
+    
+    return cleaned
 
 def get_page_id():
     """Get page ID from command line arguments or prompt user"""
@@ -74,7 +100,7 @@ def test_notion_api(page_id):
         saved_pages_dir = "saved_pages"
         os.makedirs(saved_pages_dir, exist_ok=True)
         
-        output_file = os.path.join(saved_pages_dir, f"notion_page_{page_id}.md")
+        output_file = os.path.join(saved_pages_dir, f"{clean_title_for_filename(title_text)}.md")
         with open(output_file, 'w', encoding='utf-8') as f:
             f.write(markdown_content)
         
@@ -84,7 +110,7 @@ def test_notion_api(page_id):
         if unknown_blocks:
             logging.warning(f"⚠️ Encountered unknown block types: {', '.join(unknown_blocks)}")
 
-        debug_file = os.path.join(saved_pages_dir, f"notion_page_{page_id}_debug.json")
+        debug_file = os.path.join(saved_pages_dir, f"{clean_title_for_filename(title_text)}_{page_id}_debug.json")
         with open(debug_file, 'w', encoding='utf-8') as f:
             json.dump({'page': page, 'blocks': all_blocks}, f, indent=2, default=str)
         logging.info(f"🔍 Debug JSON with structural info saved to: {debug_file}")

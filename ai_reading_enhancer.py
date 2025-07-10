@@ -16,6 +16,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from ai_handler import create_ai_handler
 from markdown_utils import clean_markdown_content
+from file_finder import find_markdown_file_by_page_id
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -49,17 +50,10 @@ def get_page_id():
 
 def find_markdown_file(page_id):
     """Find the markdown file for the given page ID in saved_pages directory"""
-    saved_pages_dir = Path("saved_pages")
+    markdown_file = find_markdown_file_by_page_id(page_id)
     
-    if not saved_pages_dir.exists():
-        logging.error("❌ saved_pages directory not found")
-        return None
-    
-    # Look for the markdown file
-    markdown_file = saved_pages_dir / f"notion_page_{page_id}.md"
-    
-    if not markdown_file.exists():
-        logging.error(f"❌ Markdown file not found: {markdown_file}")
+    if not markdown_file:
+        logging.error(f"❌ Markdown file not found for page_id: {page_id}")
         return None
     
     logging.info(f"✅ Found markdown file: {markdown_file}")
