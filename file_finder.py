@@ -36,11 +36,29 @@ def find_files_by_page_id(page_id: str, saved_pages_dir: str = "saved_pages") ->
     if debug_file:
         # Extract the title-based filename from the debug file
         debug_name = debug_file.stem  # Remove .json extension
-        # Remove the page_id suffix to get the title part
-        title_part = debug_name.replace(f"_{page_id}_debug", "")
-        markdown_file = saved_pages_path / f"{title_part}.md"
         
-        if not markdown_file.exists():
+        # Handle both old and new format
+        if f"_{page_id}_debug" in debug_name:
+            # Old format: title_{page_id}_debug
+            title_part = debug_name.replace(f"_{page_id}_debug", "")
+            markdown_file = saved_pages_path / f"{title_part}.md"
+        else:
+            # New format: title_{page_id}_{timestamp}_debug
+            # Find the page_id position and extract everything before it
+            page_id_pos = debug_name.find(f"_{page_id}_")
+            if page_id_pos != -1:
+                title_part = debug_name[:page_id_pos]
+                # Look for markdown file with timestamp
+                for md_file in saved_pages_path.glob(f"{title_part}_*.md"):
+                    if not md_file.name.endswith("_debug.md"):  # Skip any debug markdown files
+                        markdown_file = md_file
+                        break
+                else:
+                    markdown_file = None
+            else:
+                markdown_file = None
+        
+        if markdown_file and not markdown_file.exists():
             logging.warning(f"⚠️ Found debug file but no corresponding markdown file: {markdown_file}")
             markdown_file = None
     
@@ -71,10 +89,16 @@ def find_debug_file_by_page_id(page_id: str, saved_pages_path: Path) -> Optional
         Optional[Path]: Path to debug file or None if not found
     """
     try:
-        # Look for files ending with _{page_id}_debug.json
+        # Look for files ending with _{page_id}_*_debug.json (with timestamp)
+        for file_path in saved_pages_path.glob("*_debug.json"):
+            if f"_{page_id}_" in file_path.name and file_path.name.endswith("_debug.json"):
+                logging.info(f"✅ Found debug file: {file_path}")
+                return file_path
+        
+        # Fallback: Look for old format files ending with _{page_id}_debug.json
         for file_path in saved_pages_path.glob("*_debug.json"):
             if f"_{page_id}_debug.json" in file_path.name:
-                logging.info(f"✅ Found debug file: {file_path}")
+                logging.info(f"✅ Found debug file (old format): {file_path}")
                 return file_path
         
         logging.warning(f"⚠️ No debug file found for page_id: {page_id}")

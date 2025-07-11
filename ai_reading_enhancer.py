@@ -13,6 +13,7 @@ import argparse
 import json
 import logging
 from pathlib import Path
+from datetime import datetime
 from dotenv import load_dotenv
 from ai_handler import create_ai_handler
 from markdown_utils import clean_markdown_content
@@ -122,6 +123,11 @@ def get_full_model_name(ai_choice):
     else:  # gemini
         return os.getenv('GEMINI_MODEL', 'gemini-2.5-flash-preview-05-20')
 
+def get_timestamp_string():
+    """Get a timestamp string suitable for filenames"""
+    now = datetime.now()
+    return now.strftime("%Y%m%d_%H%M%S")
+
 def save_enhanced_content(original_file_path, enhanced_content, ai_model):
     """Save the enhanced content with _AIreading and AI model suffix"""
     original_path = Path(original_file_path)
@@ -129,7 +135,9 @@ def save_enhanced_content(original_file_path, enhanced_content, ai_model):
     full_model_name = get_full_model_name(ai_model)
     # Clean the model name for filename (replace dots and dashes with underscores)
     safe_model_name = full_model_name.replace('.', '_').replace('-', '_')
-    enhanced_path = original_path.parent / f"{original_path.stem}_AIreading_{safe_model_name}.md"
+    # Add timestamp
+    timestamp = get_timestamp_string()
+    enhanced_path = original_path.parent / f"{original_path.stem}_AIreading_{safe_model_name}_{timestamp}.md"
     
     try:
         with open(enhanced_path, 'w', encoding='utf-8') as f:

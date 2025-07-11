@@ -3,6 +3,7 @@ import json
 import sys
 import argparse
 import re
+from datetime import datetime
 from notion_client import Client
 from dotenv import load_dotenv
 import logging
@@ -37,6 +38,11 @@ def clean_title_for_filename(title):
         return "notion_page"
     
     return cleaned
+
+def get_timestamp_string():
+    """Get a timestamp string suitable for filenames"""
+    now = datetime.now()
+    return now.strftime("%Y%m%d_%H%M%S")
 
 def get_page_id():
     """Get page ID from command line arguments or prompt user"""
@@ -100,7 +106,10 @@ def test_notion_api(page_id):
         saved_pages_dir = "saved_pages"
         os.makedirs(saved_pages_dir, exist_ok=True)
         
-        output_file = os.path.join(saved_pages_dir, f"{clean_title_for_filename(title_text)}.md")
+        # Generate timestamp for filenames
+        timestamp = get_timestamp_string()
+        
+        output_file = os.path.join(saved_pages_dir, f"{clean_title_for_filename(title_text)}_{timestamp}.md")
         with open(output_file, 'w', encoding='utf-8') as f:
             f.write(markdown_content)
         
@@ -110,7 +119,7 @@ def test_notion_api(page_id):
         if unknown_blocks:
             logging.warning(f"⚠️ Encountered unknown block types: {', '.join(unknown_blocks)}")
 
-        debug_file = os.path.join(saved_pages_dir, f"{clean_title_for_filename(title_text)}_{page_id}_debug.json")
+        debug_file = os.path.join(saved_pages_dir, f"{clean_title_for_filename(title_text)}_{page_id}_{timestamp}_debug.json")
         with open(debug_file, 'w', encoding='utf-8') as f:
             json.dump({'page': page, 'blocks': all_blocks}, f, indent=2, default=str)
         logging.info(f"🔍 Debug JSON with structural info saved to: {debug_file}")

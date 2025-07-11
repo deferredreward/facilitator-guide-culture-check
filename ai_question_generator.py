@@ -14,6 +14,7 @@ import argparse
 import json
 import logging
 from pathlib import Path
+from datetime import datetime
 from dotenv import load_dotenv
 from ai_handler import create_ai_handler
 from markdown_utils import clean_markdown_content
@@ -170,6 +171,11 @@ def get_full_model_name(ai_choice):
     else:  # gemini
         return os.getenv('GEMINI_MODEL', 'gemini-2.5-flash-preview-05-20')
 
+def get_timestamp_string():
+    """Get a timestamp string suitable for filenames"""
+    now = datetime.now()
+    return now.strftime("%Y%m%d_%H%M%S")
+
 def save_questions(original_file_path, questions, ai_model):
     """Save the generated questions with _TrainerQuestions and AI model suffix"""
     original_path = Path(original_file_path)
@@ -177,7 +183,9 @@ def save_questions(original_file_path, questions, ai_model):
     full_model_name = get_full_model_name(ai_model)
     # Clean the model name for filename (replace dots and dashes with underscores)
     safe_model_name = full_model_name.replace('.', '_').replace('-', '_')
-    questions_path = original_path.parent / f"{original_path.stem}_TrainerQuestions_{safe_model_name}.md"
+    # Add timestamp
+    timestamp = get_timestamp_string()
+    questions_path = original_path.parent / f"{original_path.stem}_TrainerQuestions_{safe_model_name}_{timestamp}.md"
     
     try:
         with open(questions_path, 'w', encoding='utf-8') as f:
