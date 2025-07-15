@@ -13,9 +13,11 @@ import argparse
 import json
 import logging
 from pathlib import Path
+from datetime import datetime
 from dotenv import load_dotenv
 from ai_handler import create_ai_handler
 from markdown_utils import clean_markdown_content
+from file_finder import find_markdown_file_by_page_id
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -49,17 +51,10 @@ def get_page_id():
 
 def find_markdown_file(page_id):
     """Find the markdown file for the given page ID in saved_pages directory"""
-    saved_pages_dir = Path("saved_pages")
+    markdown_file = find_markdown_file_by_page_id(page_id)
     
-    if not saved_pages_dir.exists():
-        logging.error("❌ saved_pages directory not found")
-        return None
-    
-    # Look for the markdown file
-    markdown_file = saved_pages_dir / f"notion_page_{page_id}.md"
-    
-    if not markdown_file.exists():
-        logging.error(f"❌ Markdown file not found: {markdown_file}")
+    if not markdown_file:
+        logging.error(f"❌ Markdown file not found for page_id: {page_id}")
         return None
     
     logging.info(f"✅ Found markdown file: {markdown_file}")
@@ -128,6 +123,11 @@ def get_full_model_name(ai_choice):
     else:  # gemini
         return os.getenv('GEMINI_MODEL', 'gemini-2.5-flash-preview-05-20')
 
+def get_timestamp_string():
+    """Get a timestamp string suitable for filenames"""
+    now = datetime.now()
+    return now.strftime("%Y%m%d_%H%M%S")
+
 def save_enhanced_content(original_file_path, enhanced_content, ai_model):
     """Save the enhanced content with _AIreading and AI model suffix"""
     original_path = Path(original_file_path)
@@ -135,7 +135,9 @@ def save_enhanced_content(original_file_path, enhanced_content, ai_model):
     full_model_name = get_full_model_name(ai_model)
     # Clean the model name for filename (replace dots and dashes with underscores)
     safe_model_name = full_model_name.replace('.', '_').replace('-', '_')
-    enhanced_path = original_path.parent / f"{original_path.stem}_AIreading_{safe_model_name}.md"
+    # Add timestamp
+    timestamp = get_timestamp_string()
+    enhanced_path = original_path.parent / f"{original_path.stem}_AIreading_{safe_model_name}_{timestamp}.md"
     
     try:
         with open(enhanced_path, 'w', encoding='utf-8') as f:

@@ -23,58 +23,84 @@ Here's the content to enhance:
 
 Please return the improved content, keeping the original markdown formatting intact."""
 
-# Culture:
+# Trainer Questions:
+   prompt = f"""
+You are an expert trainer and instructional designer.  
+Based on the TRAINING CONTENT below, create **one** set of evaluation questions that can be used both **before** and **after** the training.
 
-   prompt = f"""You are an expert in cross-cultural communication and educational activities. You have deep knowledge of cultural sensitivities, communication styles, and learning preferences across different regions of the world.
-
-Please analyze the following educational content and provide detailed feedback on the cultural appropriateness of the activities described. Focus on identifying where activities would work well and where they might face challenges in different cultural contexts.
-
-ANALYSIS REQUIREMENTS:
-
-1. **Activity Identification**: Identify all activities, exercises, and interactive elements in the content.
-
-2. **Cultural Region Analysis**: For each activity, analyze its suitability for:
-   - East Asia (China, Japan, Korea, etc.)
-   - South Asia (India, Pakistan, Bangladesh, etc.)
-   - Southeast Asia (Thailand, Vietnam, Indonesia, etc.)
-   - Middle East & North Africa
-   - Sub-Saharan Africa (or other regions of Africa with similar cultural contexts)
-   - Latin America & Caribbean
-   - Eastern Europe
-   - Western Europe & North America
-   - Pacific Islands
-   - other unique cultural contexts
-
-3. **Cultural Factors to Consider**:
-   - Communication styles (direct vs. indirect)
-   - Power distance and authority relationships
-   - Individualism vs. collectivism
-   - Gender roles and expectations
-   - Religious and spiritual considerations
-   - Educational traditions and preferences
-   - Physical contact and personal space
-   - Time orientation and scheduling
-   - Group dynamics and social hierarchies
-   - etc
-
-4. **For Each Activity, Provide**:
-   - **Where it would work well** and why
-   - **Where it might face challenges** and specific reasons why
-   - **Alternative activities** for regions where the original might not work well
-   - **Cultural adaptations** that could make it more suitable (outline entire activity with new instructions)
-
-5. **Format Your Response**:
-   Use clear markdown formatting with:
-   - Headers for each activity
-   - Bullet points for regions and feedback
-   - Clear explanations of cultural reasoning
-   - Specific, actionable alternative suggestions
-
-Here's the content to analyze:
-
+TRAINING CONTENT:
 {content}
 
-Please provide a comprehensive cultural analysis that would help facilitators understand how to adapt these activities for different cultural contexts."""
+### PURPOSE  
+- **Before training:** reveal knowledge gaps, prior experience, and misconceptions.  
+- **After training:** check comprehension, ability to apply concepts, and depth of understanding.
+
+### QUESTION DESIGN GUIDELINES  
+1. **Quantity** – Write **10 – 12** questions.  
+2. **Type** – Use only open‑ended or scenario‑based questions.  
+3. **Focus** – Favor **“Why…?” “How…?” “Explain…”** or realistic situations.  
+4. **No yes/no or simple “What…?” questions.**  
+5. **Language** – Short sentences, simple vocabulary, clear professional tone; suitable for learners whose first language is not English.  
+6. **Diagnostics & Application** – Each question should prompt learners to articulate reasoning, processes, or problem‑solving steps.  
+7. **Markdown Format** – Number each question (1., 2., 3., etc.).  Do **not** add extra commentary or headings; output only the questions.
+
+### OUTPUT EXAMPLE (structure only)
+1. Why is it important to…  
+2. A team faces ____. How would you…  
+3. Explain how…  
+...
+
+Return **only** the numbered question list in markdown.
+"""
+
+
+# Culture:
+   prompt = f"""
+You are an expert in cross‑cultural communication and educational activity design.  
+Analyze the TRAINING CONTENT below and give detailed feedback on the cultural appropriateness of each activity.
+
+TRAINING CONTENT:
+{content}
+
+## ANALYSIS REQUIREMENTS
+
+1. **Activity Identification**  
+   • List every activity, exercise, or interactive element found in the content.
+
+2. **Cultural‑Dimension Analysis**  
+   For **each** activity, evaluate its fit in relation to the cultural dimensions below.  
+   Comment on how the activity might succeed or struggle when participants lean toward different ends of any dimension.
+
+   - High‑ vs. Low‑Context Communication  
+   - Directness & Face‑Saving  
+   - Power Distance (high ↔ low)  
+   - Individualism ↔ Collectivism  
+   - Masculinity / Femininity (assertiveness vs. nurture)  
+   - Uncertainty Avoidance (low ↔ high)  
+   - Long‑Term vs. Short‑Term Orientation  
+   - Monochronic vs. Polychronic Time Use  
+   - Formality & Hierarchy in Learning Settings  
+   - Gender‑Role Expectations  
+   - Religious / Spiritual Sensitivities  
+   - Personal Space & Physical Contact  
+   - Feedback Style (public vs. private)  
+   - Group Dynamics (consensus vs. leader‑driven)  
+   - Other salient factors you notice
+
+3. **For Each Activity, Provide**  
+   - **Cultural Strengths:** where/why the activity is naturally effective  
+   - **Cultural Challenges:** specific mismatch risks and why they arise  
+   - **Alternative Activities:** brief outlines that achieve the same objective when challenges are likely  
+   - **Targeted Adaptations:** concrete modifications (rewritten instructions, role assignments, materials, timing, etc.) to make the original activity more inclusive
+
+4. **Formatting Guidelines**  
+   - Use a level‑2 markdown header (`##`) with the activity name.  
+   - Within each header, use nested bullet lists for *Strengths*, *Challenges*, *Alternatives*, and *Adaptations*.  
+   - Keep language concise, professional, and accessible to non‑native English speakers.
+
+Provide a comprehensive yet practical cultural analysis that helps facilitators adapt each activity for diverse intercultural classrooms.  
+Output only your analysis in the specified markdown format – no additional commentary.
+"""
 
 
 # Notes:
