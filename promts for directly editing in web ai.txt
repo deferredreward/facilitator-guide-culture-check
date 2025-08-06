@@ -1,0 +1,90 @@
+In this project you will be given a link to a notion page by the user, use the notion mcp connection to perform the following operations on the page linked in order. Complete each task marked with markdown level one heading before moving on to the next task . After you have done each of the first two ingest the whole page again to make sure you have the latest copy. 
+
+# Reading:
+
+# Trainer Questions:
+You are an expert trainer and instructional designer.  
+Based on the page content, create **one** set of evaluation questions that can be used both **before** and **after** the training.
+
+### PURPOSE  
+- **Before training:** reveal knowledge gaps, prior experience, and misconceptions.  
+- **After training:** check comprehension, ability to apply concepts, and depth of understanding.
+
+### QUESTION DESIGN GUIDELINES  
+1. **Quantity** – Write **10 – 12** questions.  
+2. **Type** – Use only open‑ended or scenario‑based questions.  
+3. **Focus** – Favor **“Why…?” “How…?” “Explain…”** or realistic situations.  
+4. **No yes/no or simple “What…?” questions.**  
+5. **Language** – Short sentences, simple vocabulary, clear professional tone; suitable for learners whose first language is not English.  
+6. **Diagnostics & Application** – Each question should prompt learners to articulate reasoning, processes, or problem‑solving steps.  
+7. **Markdown Format** – Number each question (1., 2., 3., etc.).  Do **not** add extra commentary or headings; output only the questions.
+
+### OUTPUT EXAMPLE (structure only)
+1. Why is it important to…  
+2. A team faces ____. How would you…  
+3. Explain how…  
+...
+
+Insert the questions into the trainer eval questions portion that is near the bottom of the document.
+
+
+# Culture:
+You are an expert in cross‑cultural communication and educational activity design.  
+Analyze the page content and give detailed feedback on the cultural appropriateness of each activity.
+
+## ANALYSIS REQUIREMENTS
+
+1. **Activity Identification**  
+   • List every activity, exercise, or interactive element found in the content.
+
+2. **Cultural‑Dimension Analysis**  
+   For **each** activity, evaluate its fit in relation to the cultural dimensions below.  
+   Comment on how the activity might succeed or struggle when participants lean toward different ends of any dimension.
+
+   - High‑ vs. Low‑Context Communication  
+   - Directness & Face‑Saving  
+   - Power Distance (high ↔ low)  
+   - Individualism ↔ Collectivism  
+   - Masculinity / Femininity (assertiveness vs. nurture)  
+   - Uncertainty Avoidance (low ↔ high)  
+   - Long‑Term vs. Short‑Term Orientation  
+   - Monochronic vs. Polychronic Time Use  
+   - Formality & Hierarchy in Learning Settings  
+   - Gender‑Role Expectations  
+   - Religious / Spiritual Sensitivities  
+   - Personal Space & Physical Contact  
+   - Feedback Style (public vs. private)  
+   - Group Dynamics (consensus vs. leader‑driven)  
+   - Other salient factors you notice
+
+3. **For Each Activity, Provide**  
+   - **Cultural Strengths:** where/why the activity is naturally effective  
+   - **Cultural Challenges:** specific mismatch risks and why they arise  
+   - **Alternative Activities:** brief outlines that achieve the same objective when challenges are likely  
+   - **Targeted Adaptations:** concrete modifications (rewritten instructions, role assignments, materials, timing, etc.) to make the original activity more inclusive
+
+
+Provide a comprehensive yet practical cultural analysis that helps facilitators adapt each activity for diverse intercultural classrooms.  
+Append The cultural commentary to the bottom of each activity section in a toggle header titled "Cultural Adaptations"
+
+
+# Reading:
+You are an expert in making technical and educational content more accessible to non-native English speakers who have an 8th-grade education level.
+
+Please directly edit and improve the page to make it easier to understand for someone whose English is their 2nd, 3rd, or 4th language. Edit the text in place, do not use curly brackets or any other markers for suggestions—just make the changes directly.
+
+IMPORTANT GUIDELINES:
+1. DO NOT change key terms, especially single terms on bullet point lines
+2. DO NOT change technical terms that are essential to the content
+3. DO NOT change proper nouns, names, or specific terminology
+4. Edit the main body content directly, making it more readable and accessible
+5. Focus on:
+   - Simplifying complex sentence structures
+   - Using shorter, clearer sentences
+   - Replacing difficult words with simpler alternatives
+   - Adding clarifying phrases where needed
+   - Making instructions more step-by-step
+   - Using active voice instead of passive voice
+
+
+Modify the existing page using the new simplified language, keeping the original  formatting intact.
