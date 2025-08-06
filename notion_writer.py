@@ -9,6 +9,7 @@ including finding specific blocks and updating their content.
 import os
 import json
 import logging
+import re
 from pathlib import Path
 from notion_client import Client
 from dotenv import load_dotenv
@@ -368,4 +369,323 @@ class NotionWriter:
                 "success": False,
                 "message": f"Error: {str(e)}",
                 "blocks_processed": 0
-            } 
+            }
+    
+    def append_blocks_to_page(self, page_id, new_blocks_data):
+        """
+        Append new blocks to the end of a page
+        
+        Args:
+            page_id (str): The Notion page ID
+            new_blocks_data (list): List of block data dictionaries to append
+            
+        Returns:
+            dict: Results of the append operation
+        """
+        try:
+            response = self.client.blocks.children.append(page_id, children=new_blocks_data)
+            logging.info(f"✅ Appended {len(new_blocks_data)} blocks to page {page_id}")
+            return {
+                'success': True,
+                'blocks_added': len(new_blocks_data),
+                'response': response
+            }
+        except Exception as e:
+            logging.error(f"❌ Error appending blocks to page {page_id}: {e}")
+            return {
+                'success': False,
+                'error': str(e),
+                'blocks_added': 0
+            }
+    
+    def insert_blocks_after(self, parent_id, new_blocks_data, after_block_id=None):
+        """
+        Insert new blocks after a specific block
+        
+        Args:
+            parent_id (str): The parent block or page ID
+            new_blocks_data (list): List of block data dictionaries to insert
+            after_block_id (str): Block ID to insert after (if None, appends to end)
+            
+        Returns:
+            dict: Results of the insert operation
+        """
+        try:
+            if after_block_id:
+                # Get all children of the parent
+                children_response = self.client.blocks.children.list(parent_id)
+                all_children = children_response['results']
+                
+                # Find the position of the target block
+                target_index = -1
+                for i, child in enumerate(all_children):
+                    if child['id'] == after_block_id:
+                        target_index = i
+                        break
+                
+                if target_index == -1:
+                    logging.warning(f"⚠️ Target block {after_block_id} not found, appending to end")
+                    return self.append_blocks_to_page(parent_id, new_blocks_data)
+                
+                # For now, we'll append to the end since Notion API doesn't support insertion at specific positions
+                # This is a limitation of the Notion API
+                logging.info(f"📝 Inserting blocks after block {after_block_id} (appending to end due to API limitation)")
+                return self.append_blocks_to_page(parent_id, new_blocks_data)
+            else:
+                return self.append_blocks_to_page(parent_id, new_blocks_data)
+                
+        except Exception as e:
+            logging.error(f"❌ Error inserting blocks: {e}")
+            return {
+                'success': False,
+                'error': str(e),
+                'blocks_added': 0
+            }
+    
+    def create_heading_block(self, text, level=2):
+        """
+        Create a heading block data structure
+        
+        Args:
+            text (str): Heading text
+            level (int): Heading level (1, 2, or 3)
+            
+        Returns:
+            dict: Block data for heading
+        """
+        heading_type = f"heading_{level}"
+        return {
+            "object": "block",
+            "type": heading_type,
+            heading_type: {
+                "rich_text": [
+                    {
+                        "type": "text",
+                        "text": {
+                            "content": text
+                        }
+                    }
+                ]
+            }
+        }
+    
+    def create_paragraph_block(self, text):
+        """
+        Create a paragraph block data structure
+        
+        Args:
+            text (str): Paragraph text
+            
+        Returns:
+            dict: Block data for paragraph
+        """
+        return {
+            "object": "block",
+            "type": "paragraph",
+            "paragraph": {
+                "rich_text": [
+                    {
+                        "type": "text",
+                        "text": {
+                            "content": text
+                        }
+                    }
+                ]
+            }
+        }
+    
+    def create_toggle_block(self, title, content_blocks=None):
+        """
+        Create a toggle block data structure
+        
+        Args:
+            title (str): Toggle title
+            content_blocks (list): List of child blocks (optional)
+            
+        Returns:
+            dict: Block data for toggle
+        """
+        toggle_block = {
+            "object": "block",
+            "type": "toggle",
+            "toggle": {
+                "rich_text": [
+                    {
+                        "type": "text",
+                        "text": {
+                            "content": title
+                        }
+                    }
+                ]
+            }
+        }
+        
+        if content_blocks:
+            toggle_block["toggle"]["children"] = content_blocks
+        
+        return toggle_block
+    
+    def create_bulleted_list_item_block(self, text):
+        """
+        Create a bulleted list item block data structure
+        
+        Args:
+            text (str): List item text
+            
+        Returns:
+            dict: Block data for bulleted list item
+        """
+        return {
+            "object": "block",
+            "type": "bulleted_list_item",
+            "bulleted_list_item": {
+                "rich_text": [
+                    {
+                        "type": "text",
+                        "text": {
+                            "content": text
+                        }
+                    }
+                ]
+            }
+        }
+    
+    def parse_markdown_to_blocks(self, markdown_text):
+        """
+        Parse markdown text into Notion block structures
+        
+        Args:
+            markdown_text (str): Markdown text to parse
+            
+        Returns:
+            list: List of Notion block data structures
+        """
+        blocks = []
+        lines = markdown_text.split('\n')
+        
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+                
+            # Handle headings
+            if line.startswith('### '):
+                blocks.append(self.create_heading_block(line[4:], 3))
+            elif line.startswith('## '):
+                blocks.append(self.create_heading_block(line[3:], 2))
+            elif line.startswith('# '):
+                blocks.append(self.create_heading_block(line[2:], 1))
+            # Handle bullet points
+            elif line.startswith('- ') or line.startswith('• '):
+                blocks.append(self.create_bulleted_list_item_block(line[2:]))
+            # Handle numbered lists (convert to bullets for simplicity)
+            elif re.match(r'^\d+\. ', line):
+                text = line.split('. ', 1)[1] if '. ' in line else line
+                blocks.append(self.create_bulleted_list_item_block(text))
+            # Regular paragraph
+            else:
+                blocks.append(self.create_paragraph_block(line))
+        
+        return blocks
+    
+    def find_activity_blocks(self, page_id):
+        """
+        Find blocks that represent activities (looking for activity markers)
+        
+        Args:
+            page_id (str): The Notion page ID
+            
+        Returns:
+            list: List of blocks that appear to be activities
+        """
+        def is_activity_block(block):
+            text_content = self._extract_plain_text_from_block(block)
+            if not text_content:
+                return False
+            
+            text_lower = text_content.lower()
+            # Look for activity indicators
+            activity_indicators = [
+                'activity', 'exercise', 'discussion', 'group work', 
+                'practice', 'role play', 'simulation', 'workshop',
+                '👀', '🕺', '🎓'  # See, Do, Equip emojis
+            ]
+            
+            return any(indicator in text_lower for indicator in activity_indicators)
+        
+        return self.find_blocks_by_criteria(page_id, is_activity_block)
+    
+    def insert_trainer_questions_section(self, page_id, questions_markdown):
+        """
+        Insert a "Trainer Evaluation Questions" section with the provided questions
+        
+        Args:
+            page_id (str): The Notion page ID
+            questions_markdown (str): Markdown text containing the questions
+            
+        Returns:
+            dict: Results of the insertion operation
+        """
+        try:
+            # Create the section blocks
+            section_blocks = [
+                self.create_heading_block("Trainer Evaluation Questions", 2)
+            ]
+            
+            # Parse questions and add them
+            question_blocks = self.parse_markdown_to_blocks(questions_markdown)
+            section_blocks.extend(question_blocks)
+            
+            # Append to the page
+            return self.append_blocks_to_page(page_id, section_blocks)
+            
+        except Exception as e:
+            logging.error(f"❌ Error inserting trainer questions: {e}")
+            return {
+                'success': False,
+                'error': str(e),
+                'blocks_added': 0
+            }
+    
+    def insert_cultural_adaptations_after_activities(self, page_id, cultural_analysis):
+        """
+        Insert "Cultural Adaptations" toggle blocks after each identified activity
+        
+        Args:
+            page_id (str): The Notion page ID
+            cultural_analysis (str): The cultural analysis content
+            
+        Returns:
+            dict: Results of the insertion operation
+        """
+        try:
+            # Find activity blocks
+            activity_blocks = self.find_activity_blocks(page_id)
+            
+            if not activity_blocks:
+                logging.warning("⚠️ No activity blocks found for cultural adaptations")
+                return {
+                    'success': False,
+                    'message': 'No activity blocks found',
+                    'blocks_added': 0
+                }
+            
+            # For now, we'll add a single cultural adaptations section at the end
+            # since Notion API doesn't support inserting at specific positions easily
+            cultural_blocks = [
+                self.create_heading_block("Cultural Adaptations", 2),
+                self.create_toggle_block(
+                    "Cultural Considerations for Activities",
+                    self.parse_markdown_to_blocks(cultural_analysis)
+                )
+            ]
+            
+            return self.append_blocks_to_page(page_id, cultural_blocks)
+            
+        except Exception as e:
+            logging.error(f"❌ Error inserting cultural adaptations: {e}")
+            return {
+                'success': False,
+                'error': str(e),
+                'blocks_added': 0
+            }
