@@ -1,25 +1,34 @@
 # Facilitator Guide Culture Check
 
-A comprehensive suite of tools for scraping, analyzing, and non-destructively modifying Notion pages with AI-powered enhancements.
+A comprehensive, intelligent suite for scraping, analyzing, and **non-destructively** enhancing Notion pages with advanced AI-powered content improvements. Features breakthrough formatting preservation and targeted cultural adaptations.
+
+## 🎉 **RECENT BREAKTHROUGHS**
+- ✅ **Formatting Preservation Revolution**: Maintains Notion's rich text structure during AI enhancement
+- ✅ **Intelligent Block-by-Block Updates**: Real-time AI assistance with structure awareness
+- ✅ **Protected Content Safety**: Bulletproof synced block protection
+- ✅ **Visual Element Preservation**: Emojis, icons, and formatting patterns maintained
+- ✅ **Toggle Content Processing**: Discovers and enhances hidden content in collapsed sections
+- ✅ **Targeted Cultural Recommendations**: Activity-specific cultural adaptations
 
 ## 🎯 Project Overview
 
 This project provides a complete workflow for working with Notion pages:
 
-1. **Scraping**: Extract Notion page content to markdown and JSON
-2. **AI Analysis**: Analyze content for cultural appropriateness and reading level
-3. **Writing Back**: Non-destructively modify Notion page content
-4. **Testing**: Comprehensive testing framework for modifications
+1. **🔍 Intelligent Scraping**: Extract complete Notion page content with structure preservation
+2. **🤖 Advanced AI Analysis**: Block-by-block content enhancement with formatting awareness
+3. **✍️ Non-Destructive Enhancement**: Structure-preserving content improvements with synced block protection
+4. **🎯 Targeted Cultural Adaptations**: Activity-specific cultural recommendations with smart placement
+5. **📊 Comprehensive Analytics**: Dual logging system for program operations and AI interactions
 
 ## 🚀 Features
 
-### 📄 Notion Scraping (`notion_scraper.py`)
-- **Complete page extraction** to markdown format
-- **Structured JSON export** with full block hierarchy
-- **Recursive block traversal** including nested content
-- **Rich text formatting** preservation
-- **Multiple block types** support (paragraphs, headings, lists, etc.)
-- **Caching system** for efficient repeated access
+### 📄 Notion Scraping (`notion_scraper.py`) - **ENHANCED SYSTEM**
+- **🔍 Complete page extraction** to markdown with structure preservation
+- **📊 Structured JSON export** with full block hierarchy and debug info
+- **🔄 Recursive block traversal** including nested and toggle content
+- **🎨 Rich text formatting** preservation with annotation support
+- **🧱 Advanced block support**: columns, toggles, callouts, dividers, synced blocks
+- **💾 Intelligent caching** for efficient repeated access and before/after comparison
 
 ### 🤖 AI-Powered Analysis
 
@@ -48,6 +57,36 @@ This project provides a complete workflow for working with Notion pages:
 - **Interactive cache refresh** options
 - **Comprehensive test coverage**
 - **Command-line interface** with multiple options
+
+## 🚀 **QUICK START - ORCHESTRATOR**
+
+### **Complete AI Enhancement Workflow**
+```bash
+# Run complete workflow: scrape + questions + culture + reading enhancement
+python orchestrator.py <notion_page_url> --ai claude
+
+# Dry run first (recommended)
+python orchestrator.py <notion_page_url> --ai claude --dry-run
+
+# Use different AI models
+python orchestrator.py <page_id> --ai gemini
+```
+
+### **Individual Component Usage**
+```bash
+# Analyze page structure and formatting issues
+python page_formatter_analyzer.py <page_id>
+
+# Scrape only
+python notion_scraper.py <page_id>
+
+# Individual AI enhancements
+python ai_question_generator.py <page_id> --ai claude
+python cultural_activity_analyzer.py <page_id> --ai claude  
+python ai_reading_enhancer.py <page_id> --ai claude
+```
+
+---
 
 ## 🛠️ Installation
 
