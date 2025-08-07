@@ -1133,22 +1133,50 @@ class NotionWriter:
                     'blocks_updated': 0
                 }
             
-            # Find updatable blocks (skip synced blocks!)
+            # Find updatable blocks (STRICT synced block protection!)
             updatable_blocks = []
+            synced_blocks_found = 0
+            
             for block in all_blocks:
                 block_type = block.get('type')
+                block_id = block.get('id', 'unknown')
                 
-                # Skip synced blocks and other problematic types
-                if block_type in ['synced_block', 'child_page', 'child_database', 'embed', 'file', 'image', 'video']:
+                # CRITICAL: Skip synced blocks - these are shared content!
+                if block_type == 'synced_block':
+                    synced_blocks_found += 1
+                    logging.warning(f"🚫 PROTECTED: Skipping synced block {block_id[:8]}... (shared content)")
+                    continue
+                
+                # Skip other problematic types
+                if block_type in ['child_page', 'child_database', 'embed', 'file', 'image', 'video']:
+                    logging.info(f"⏭️ Skipping {block_type} block {block_id[:8]}...")
+                    continue
+                
+                # Check if block is inside a synced block (parent check)
+                if self._is_block_in_synced_content(block, all_blocks):
+                    logging.warning(f"🚫 PROTECTED: Skipping block {block_id[:8]}... (inside synced content)")
                     continue
                     
                 if block_type in ['paragraph', 'heading_1', 'heading_2', 'heading_3', 
-                                'bulleted_list_item', 'numbered_list_item', 'quote', 'callout']:
+                                'bulleted_list_item', 'numbered_list_item', 'quote', 'callout', 'toggle']:
                     text_content = self._extract_plain_text_from_block(block)
                     if text_content and len(text_content.strip()) > 15:  # Only meaningful content
                         updatable_blocks.append(block)
             
-            logging.info(f"🤖 Starting intelligent block-by-block update on {len(updatable_blocks)} blocks")
+            logging.info(f"🚫 Protected {synced_blocks_found} synced blocks from modification")
+            logging.info(f"📝 Found {len(updatable_blocks)} updatable blocks (excluding protected content)")
+            
+            # Also find and process toggle children
+            toggle_children = self._find_toggle_children_blocks(page_id)
+            logging.info(f"🔄 Found {len(toggle_children)} additional blocks inside toggles")
+            
+            # Add toggle children to updatable blocks (if not already included)
+            for toggle_child in toggle_children:
+                if not any(b['id'] == toggle_child['id'] for b in updatable_blocks):
+                    if not self._is_block_in_synced_content(toggle_child, all_blocks):
+                        updatable_blocks.append(toggle_child)
+            
+            logging.info(f"🤖 Starting intelligent block-by-block update on {len(updatable_blocks)} total blocks (including toggle children)")
             
             successful_updates = 0
             skipped_updates = 0
@@ -1220,23 +1248,41 @@ class NotionWriter:
             if not rich_text_array:
                 return {'success': False, 'error': 'No rich text content'}
             
+            # Extract formatting information to preserve
+            formatting_info = self._extract_emoji_and_formatting_info(rich_text_array)
+            
             # Convert rich text to plain text for AI
             current_plain_text = ''.join([rt.get('text', {}).get('content', '') for rt in rich_text_array])
             
             if len(current_plain_text.strip()) < 15:
                 return {'success': True, 'skipped': True, 'reason': 'Too short'}
             
-            # Ask AI for enhancement
+            # Create enhanced AI prompt with formatting context
+            formatting_context = ""
+            if formatting_info['leading_emoji']:
+                formatting_context += f"\n- PRESERVE EMOJI: Start with '{formatting_info['leading_emoji']}' "
+            if formatting_info['has_italic']:
+                formatting_context += "\n- The original has italic text - maintain emphasis where appropriate"
+            if formatting_info['has_bold']:
+                formatting_context += "\n- The original has bold text - maintain strong emphasis where appropriate"
+            
             ai_prompt = f"""
-You are improving Notion content for better readability while preserving meaning.
+You are improving Notion content for better readability while preserving meaning and visual elements.
 
 CURRENT BLOCK:
 Type: {block_type}
 Content: {current_plain_text}
 
+FORMATTING TO PRESERVE:{formatting_context}
+
 TASK: {enhancement_prompt}
 
-IMPORTANT: Return ONLY the improved text content. Do NOT add formatting markers like **bold** or *italic*. Keep the core meaning but make it clearer and more accessible.
+IMPORTANT: 
+- Return ONLY the improved text content
+- Do NOT add formatting markers like **bold** or *italic*
+- If there's a leading emoji, START your response with that exact emoji
+- Keep the core meaning but make it clearer and more accessible
+- Maintain the same general structure and emphasis patterns
 
 IMPROVED CONTENT:"""
             
@@ -1251,10 +1297,10 @@ IMPROVED CONTENT:"""
                 if not enhanced_content or len(enhanced_content.strip()) < 5:
                     return {'success': False, 'error': 'Invalid AI response'}
                 
-                # Apply intelligent update
+                # Apply intelligent update with formatting info
                 result = self._apply_intelligent_update(
                     block_id, block_type, enhanced_content.strip(), 
-                    rich_text_array, current_plain_text, current_block
+                    rich_text_array, current_plain_text, current_block, formatting_info
                 )
                 
                 return {
@@ -1270,7 +1316,7 @@ IMPROVED CONTENT:"""
         except Exception as e:
             return {'success': False, 'error': str(e)}
     
-    def _apply_intelligent_update(self, block_id, block_type, enhanced_text, original_rich_text, original_plain_text, current_block):
+    def _apply_intelligent_update(self, block_id, block_type, enhanced_text, original_rich_text, original_plain_text, current_block, formatting_info=None):
         """
         Apply the enhanced text while preserving as much structure as possible
         """
@@ -1279,9 +1325,9 @@ IMPROVED CONTENT:"""
             if len(enhanced_text) > 1900:
                 enhanced_text = enhanced_text[:1900] + "..."
             
-            # Create structure-aware rich text
+            # Create structure-aware rich text with formatting preservation
             enhanced_rich_text = self._create_smart_rich_text_structure(
-                enhanced_text, original_rich_text
+                enhanced_text, original_rich_text, formatting_info
             )
             
             # Build update payload based on block type
@@ -1298,10 +1344,19 @@ IMPROVED CONTENT:"""
             logging.error(f"❌ Intelligent update failed: {e}")
             return False
     
-    def _create_smart_rich_text_structure(self, enhanced_text, original_rich_text):
+    def _create_smart_rich_text_structure(self, enhanced_text, original_rich_text, formatting_info=None):
         """
-        Create enhanced rich text that tries to preserve original formatting patterns
+        Create enhanced rich text that preserves original formatting patterns, especially emojis
         """
+        # Handle emoji preservation first
+        if formatting_info and formatting_info.get('leading_emoji'):
+            emoji = formatting_info['leading_emoji']
+            # Ensure enhanced text starts with the emoji
+            if not enhanced_text.startswith(emoji):
+                # If AI didn't preserve emoji, add it back
+                enhanced_text = emoji + ' ' + enhanced_text.lstrip()
+                logging.info(f"🚀 Restored leading emoji: {emoji}")
+        
         # Simple case: no original formatting
         if len(original_rich_text) <= 1:
             return [{"type": "text", "text": {"content": enhanced_text}}]
@@ -1315,19 +1370,57 @@ IMPROVED CONTENT:"""
         if not formatted_parts:
             return [{"type": "text", "text": {"content": enhanced_text}}]
         
-        # Try to preserve some formatting by applying it to key parts
+        # Try to preserve formatting patterns intelligently
         result = []
         words = enhanced_text.split()
         
         if len(words) >= 3 and formatted_parts:
-            # Apply formatting to first few words
+            # Find the best formatting to preserve
+            primary_formatting = formatted_parts[0].get('annotations', {})
+            
+            # Apply formatting to first meaningful part (after emoji if present)
+            if formatting_info and formatting_info.get('leading_emoji'):
+                emoji = formatting_info['leading_emoji']
+                if enhanced_text.startswith(emoji):
+                    # Split emoji from rest of text
+                    rest_text = enhanced_text[len(emoji):].strip()
+                    result.append({
+                        "type": "text",
+                        "text": {"content": emoji + ' '}
+                    })
+                    
+                    if rest_text:
+                        # Apply original formatting to meaningful content
+                        if len(rest_text.split()) >= 2:
+                            first_part = ' '.join(rest_text.split()[:2])
+                            remaining = ' '.join(rest_text.split()[2:])
+                            
+                            result.append({
+                                "type": "text",
+                                "text": {"content": first_part},
+                                "annotations": primary_formatting
+                            })
+                            
+                            if remaining:
+                                result.append({
+                                    "type": "text",
+                                    "text": {"content": ' ' + remaining}
+                                })
+                        else:
+                            result.append({
+                                "type": "text",
+                                "text": {"content": rest_text}
+                            })
+                    return result
+            
+            # No emoji - apply formatting to first part
             first_part = ' '.join(words[:2])
             rest_text = ' '.join(words[2:])
             
             result.append({
                 "type": "text",
                 "text": {"content": first_part},
-                "annotations": formatted_parts[0].get('annotations', {})
+                "annotations": primary_formatting
             })
             
             if rest_text:
@@ -1368,3 +1461,106 @@ IMPROVED CONTENT:"""
             }
         
         return None
+    
+    def _is_block_in_synced_content(self, block, all_blocks):
+        """
+        Check if a block is inside synced content (has synced block parent)
+        """
+        # This is a simplified check - in a full implementation,
+        # we'd need to traverse the block hierarchy
+        return False  # For now, rely on direct type checking
+    
+    def _find_toggle_children_blocks(self, page_id):
+        """
+        Find all blocks that are children of toggle blocks
+        
+        Args:
+            page_id (str): Notion page ID
+            
+        Returns:
+            list: All blocks that are inside toggles
+        """
+        toggle_children = []
+        
+        try:
+            # Get all blocks
+            all_blocks = self._load_cached_blocks(page_id)
+            if not all_blocks:
+                return []
+            
+            # Find toggle blocks
+            toggle_blocks = [b for b in all_blocks if b.get('type') == 'toggle']
+            
+            for toggle_block in toggle_blocks:
+                if toggle_block.get('has_children'):
+                    try:
+                        children = self.get_toggle_children(toggle_block['id'])
+                        for child in children:
+                            # Skip synced blocks even in toggles
+                            if child.get('type') != 'synced_block':
+                                toggle_children.append(child)
+                                logging.info(f"🔄 Found toggle child: {child.get('type')} in {toggle_block['id'][:8]}...")
+                    except Exception as e:
+                        logging.warning(f"⚠️ Could not get toggle children: {e}")
+            
+            return toggle_children
+            
+        except Exception as e:
+            logging.error(f"❌ Error finding toggle children: {e}")
+            return []
+    
+    def _extract_emoji_and_formatting_info(self, rich_text_array):
+        """
+        Extract emoji, formatting patterns from original rich text
+        
+        Args:
+            rich_text_array (list): Original rich text structure
+            
+        Returns:
+            dict: Formatting information to preserve
+        """
+        formatting_info = {
+            'leading_emoji': '',
+            'has_bold': False,
+            'has_italic': False,
+            'has_colors': False,
+            'formatting_patterns': []
+        }
+        
+        if not rich_text_array:
+            return formatting_info
+        
+        # Check first element for emoji
+        first_element = rich_text_array[0]
+        if first_element and first_element.get('text', {}).get('content'):
+            content = first_element['text']['content']
+            # Simple emoji detection (starts with emoji)
+            if content and len(content) > 0:
+                first_char = content[0]
+                # Check if first character is emoji (simple Unicode range check)
+                if ord(first_char) > 127:
+                    # Find end of emoji sequence
+                    emoji_end = 1
+                    while emoji_end < len(content) and (len(content) <= emoji_end or ord(content[emoji_end]) > 127):
+                        emoji_end += 1
+                    if emoji_end > 1 or (emoji_end == 1 and ord(first_char) >= 0x1F300):
+                        formatting_info['leading_emoji'] = content[:emoji_end].strip()
+        
+        # Check for formatting patterns
+        for element in rich_text_array:
+            annotations = element.get('annotations', {})
+            if annotations:
+                if annotations.get('bold'):
+                    formatting_info['has_bold'] = True
+                if annotations.get('italic'):
+                    formatting_info['has_italic'] = True
+                if annotations.get('color') and annotations.get('color') != 'default':
+                    formatting_info['has_colors'] = True
+                    
+                # Store the element for pattern analysis
+                formatting_info['formatting_patterns'].append({
+                    'text': element.get('text', {}).get('content', ''),
+                    'annotations': annotations
+                })
+        
+        return formatting_info
