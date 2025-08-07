@@ -157,6 +157,141 @@ class NotionWriter:
         
         return ''.join(text_parts)
     
+    def _get_rich_text_from_block(self, block, block_type):
+        """Extract rich text array from a block"""
+        if block_type == 'paragraph':
+            return block.get('paragraph', {}).get('rich_text', [])
+        elif block_type.startswith('heading_'):
+            return block.get(block_type, {}).get('rich_text', [])
+        elif block_type == 'bulleted_list_item':
+            return block.get('bulleted_list_item', {}).get('rich_text', [])
+        elif block_type == 'numbered_list_item':
+            return block.get('numbered_list_item', {}).get('rich_text', [])
+        elif block_type == 'to_do':
+            return block.get('to_do', {}).get('rich_text', [])
+        elif block_type == 'quote':
+            return block.get('quote', {}).get('rich_text', [])
+        elif block_type == 'callout':
+            return block.get('callout', {}).get('rich_text', [])
+        elif block_type == 'toggle':
+            return block.get('toggle', {}).get('rich_text', [])
+        return []
+    
+    def _map_enhanced_text_to_structure(self, enhanced_text, existing_rich_text, original_text):
+        """Map enhanced text to existing rich text structure preserving formatting"""
+        # If the enhanced text is very similar to original, try to preserve structure
+        if len(enhanced_text) > 0 and len(original_text) > 0:
+            # Calculate similarity ratio (simple approach)
+            similarity = len(set(enhanced_text.lower().split()) & set(original_text.lower().split())) / max(len(enhanced_text.split()), len(original_text.split()))
+            
+            if similarity > 0.6:  # If texts are similar enough, preserve some formatting
+                # Try to map enhanced text to existing structure
+                return self._preserve_formatting_structure(enhanced_text, existing_rich_text)
+        
+        # Fallback: create simple structure
+        return [
+            {
+                "type": "text",
+                "text": {
+                    "content": enhanced_text
+                }
+            }
+        ]
+    
+    def _preserve_formatting_structure(self, enhanced_text, existing_rich_text):
+        """Attempt to preserve some formatting when updating text"""
+        # Simple approach: if first part of existing text has formatting, preserve it
+        if existing_rich_text and len(existing_rich_text) > 0:
+            first_part = existing_rich_text[0]
+            if first_part.get('annotations', {}):
+                # If the first part has formatting, keep some of it
+                words = enhanced_text.split()
+                if words:
+                    first_word_length = min(len(words[0]), 50)  # Limit formatting to reasonable length
+                    
+                    result = [
+                        {
+                            "type": "text",
+                            "text": {
+                                "content": enhanced_text[:first_word_length]
+                            },
+                            "annotations": first_part.get('annotations', {})
+                        }
+                    ]
+                    
+                    if len(enhanced_text) > first_word_length:
+                        result.append({
+                            "type": "text",
+                            "text": {
+                                "content": enhanced_text[first_word_length:]
+                            }
+                        })
+                    
+                    return result
+        
+        # Default fallback
+        return [
+            {
+                "type": "text",
+                "text": {
+                    "content": enhanced_text
+                }
+            }
+        ]
+    
+    def _preserve_links_and_mentions(self, enhanced_text, existing_rich_text):
+        """Preserve links and mentions from existing rich text"""
+        result = []
+        
+        # Look for existing links and mentions in the rich text
+        existing_links = []
+        for rt in existing_rich_text:
+            if rt.get('type') in ['mention', 'text']:
+                if rt.get('text', {}).get('link') or rt.get('mention'):
+                    existing_links.append(rt)
+        
+        # If we have links to preserve, try to maintain them
+        if existing_links and len(enhanced_text) > 10:
+            # Simple approach: add enhanced text then preserve one key link
+            result.append({
+                "type": "text",
+                "text": {
+                    "content": enhanced_text
+                }
+            })
+            
+            # Add preserved link at the end if it makes sense
+            if existing_links:
+                result.append({
+                    "type": "text",
+                    "text": {"content": " "}
+                })
+                result.append(existing_links[0])  # Preserve first important link
+            
+            return result
+        
+        return [
+            {
+                "type": "text",
+                "text": {
+                    "content": enhanced_text
+                }
+            }
+        ]
+    
+    def update_block_text(self, block_id, new_text):
+        """
+        Legacy method - now calls the structure-preserving version
+        
+        Args:
+            block_id (str): The block ID to update
+            new_text (str): The new text content
+            
+        Returns:
+            dict: The updated block response
+        """
+        return self.update_block_text_preserving_structure(block_id, new_text, "")
+    
     def reverse_words_in_text(self, text):
         """
         Reverse each word in the text while keeping word order
@@ -191,34 +326,43 @@ class NotionWriter:
         
         return ''.join(reversed_words)
     
-    def update_block_text(self, block_id, new_text):
+    def update_block_text_preserving_structure(self, block_id, enhanced_text, original_text):
         """
-        Update a block's text content
+        Update a block's text content while preserving rich text structure
         
         Args:
             block_id (str): The block ID to update
-            new_text (str): The new text content
+            enhanced_text (str): The enhanced plain text content
+            original_text (str): The original plain text for comparison
             
         Returns:
             dict: The updated block response
         """
         try:
-            # Get the current block to determine its type
+            # Get the current block to preserve its structure
             current_block = self.client.blocks.retrieve(block_id)
             block_type = current_block.get('type')
             
             if not block_type:
                 raise ValueError(f"Could not determine block type for {block_id}")
             
-            # Create the rich text array for the new content
-            new_rich_text = [
-                {
-                    "type": "text",
-                    "text": {
-                        "content": new_text
+            # Get existing rich text structure
+            existing_rich_text = self._get_rich_text_from_block(current_block, block_type)
+            
+            # Create enhanced rich text preserving structure when possible
+            if existing_rich_text and len(existing_rich_text) > 1:
+                # Try to preserve formatting by intelligent mapping
+                new_rich_text = self._map_enhanced_text_to_structure(enhanced_text, existing_rich_text, original_text)
+            else:
+                # Simple case: create new rich text array
+                new_rich_text = [
+                    {
+                        "type": "text",
+                        "text": {
+                            "content": enhanced_text
+                        }
                     }
-                }
-            ]
+                ]
             
             # Create update payload based on block type
             if block_type == 'paragraph':
@@ -876,9 +1020,13 @@ class NotionWriter:
                                 if len(enhanced_text.strip()) > 1900:
                                     trimmed_text += "..."
                                 
-                                self.update_block_text(block['id'], trimmed_text)
+                                # Get original text for structure preservation
+                                original_text = self._extract_plain_text_from_block(block)
+                                
+                                # Use structure-preserving update
+                                self.update_block_text_preserving_structure(block['id'], trimmed_text, original_text)
                                 updated_count += 1
-                                logging.info(f"📝 Updated block with enhanced content")
+                                logging.info(f"📝 Updated block with enhanced content (preserving structure)")
                 except Exception as e:
                     logging.warning(f"⚠️ Could not update block {block['id']}: {e}")
             
