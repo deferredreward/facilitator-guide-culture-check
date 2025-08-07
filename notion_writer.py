@@ -841,9 +841,15 @@ class NotionWriter:
                 enhanced_sections.append('\n'.join(current_section))
             
             # Find updatable text blocks and update them with enhanced content
+            # SKIP synced blocks to avoid modifying shared content
             updatable_blocks = []
             for block in all_blocks:
                 block_type = block.get('type')
+                
+                # Skip synced blocks - these are shared content that shouldn't be modified
+                if block_type == 'synced_block':
+                    continue
+                    
                 if block_type in ['paragraph', 'heading_1', 'heading_2', 'heading_3', 
                                 'bulleted_list_item', 'numbered_list_item']:
                     text_content = self._extract_plain_text_from_block(block)
