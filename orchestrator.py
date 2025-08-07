@@ -55,12 +55,20 @@ def setup_dual_logging():
     # Create separate AI interaction logger
     ai_logger = logging.getLogger('ai_interactions')
     ai_logger.setLevel(logging.INFO)
-    ai_handler = logging.FileHandler(ai_log_file, encoding='utf-8')
-    ai_handler.setFormatter(logging.Formatter('%(asctime)s - AI - %(message)s'))
-    ai_logger.addHandler(ai_handler)
+    # Prevent propagation to avoid duplicate messages
+    ai_logger.propagate = False
+    ai_file_handler = logging.FileHandler(ai_log_file, encoding='utf-8')
+    ai_file_handler.setFormatter(logging.Formatter('%(asctime)s - AI - %(message)s'))
+    ai_logger.addHandler(ai_file_handler)
+    # Force flush
+    ai_file_handler.flush()
     
     logging.info(f"📝 Program logging: {program_log_file}")
     logging.info(f"🤖 AI interaction logging: {ai_log_file}")
+    
+    # Test AI logging immediately
+    ai_logger.info("AI interaction logging system initialized")
+    ai_file_handler.flush()
     
     return program_log_file, ai_log_file
 
@@ -109,12 +117,18 @@ def extract_page_id_from_url(url_or_id):
 
 def log_ai_interaction(prompt, response, model_type, operation):
     """Log AI interactions separately"""
-    ai_logger.info(f"=== {operation.upper()} ===")
-    ai_logger.info(f"Model: {model_type}")
-    ai_logger.info(f"Prompt (first 200 chars): {prompt[:200]}...")
-    ai_logger.info(f"Response (first 500 chars): {response[:500]}...")
-    ai_logger.info(f"Full response length: {len(response)} characters")
-    ai_logger.info("=" * 60)
+    try:
+        ai_logger = logging.getLogger('ai_interactions')
+        ai_logger.info(f"=== {operation.upper()} ===")
+        ai_logger.info(f"Model: {model_type}")
+        ai_logger.info(f"Prompt (first 200 chars): {prompt[:200]}...")
+        ai_logger.info(f"Response (first 500 chars): {response[:500]}...")
+        ai_logger.info(f"Full response length: {len(response)} characters")
+        ai_logger.info("=" * 60)
+        # Also log to main logger for now
+        logging.info(f"AI Interaction logged: {operation} with {model_type}")
+    except Exception as e:
+        logging.error(f"Failed to log AI interaction: {e}")
 
 class NotionOrchestrator:
     """Orchestrates the complete AI enhancement workflow"""
@@ -321,7 +335,7 @@ Provide brief, practical cultural adaptation suggestions focusing on:
 Keep suggestions concise and actionable."""
                             
                             try:
-                                cultural_analysis = self.ai_handler.generate_content(cultural_prompt)
+                                cultural_analysis = self.ai_handler.get_response(cultural_prompt)
                                 log_ai_interaction(cultural_prompt, cultural_analysis, self.ai_model, "CULTURAL_ANALYSIS_SPECIFIC")
                                 
                                 if cultural_analysis:

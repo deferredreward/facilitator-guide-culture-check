@@ -1242,7 +1242,7 @@ IMPROVED CONTENT:"""
             
             # Get AI enhancement
             try:
-                enhanced_content = ai_handler.generate_content(ai_prompt)
+                enhanced_content = ai_handler.get_response(ai_prompt)
                 
                 # Log AI interaction
                 from orchestrator import log_ai_interaction
