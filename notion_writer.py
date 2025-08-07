@@ -140,6 +140,10 @@ class NotionWriter:
             rich_text = block.get('to_do', {}).get('rich_text', [])
         elif block_type == 'quote':
             rich_text = block.get('quote', {}).get('rich_text', [])
+        elif block_type == 'callout':
+            rich_text = block.get('callout', {}).get('rich_text', [])
+        elif block_type == 'toggle':
+            rich_text = block.get('toggle', {}).get('rich_text', [])
         else:
             return ""
         
@@ -525,6 +529,87 @@ class NotionWriter:
         
         return toggle_block
     
+    def create_callout_block(self, text, emoji="📝", color="default"):
+        """
+        Create a callout block data structure
+        
+        Args:
+            text (str): Callout text
+            emoji (str): Callout icon emoji
+            color (str): Callout color
+            
+        Returns:
+            dict: Block data for callout
+        """
+        return {
+            "object": "block",
+            "type": "callout",
+            "callout": {
+                "rich_text": [
+                    {
+                        "type": "text",
+                        "text": {
+                            "content": text
+                        }
+                    }
+                ],
+                "icon": {
+                    "type": "emoji",
+                    "emoji": emoji
+                },
+                "color": color
+            }
+        }
+    
+    def create_divider_block(self):
+        """
+        Create a divider block data structure
+        
+        Returns:
+            dict: Block data for divider
+        """
+        return {
+            "object": "block",
+            "type": "divider",
+            "divider": {}
+        }
+    
+    def create_column_list_block(self, columns):
+        """
+        Create a column list block with column children
+        
+        Args:
+            columns (list): List of column block data
+            
+        Returns:
+            dict: Block data for column list
+        """
+        return {
+            "object": "block",
+            "type": "column_list",
+            "column_list": {
+                "children": columns
+            }
+        }
+    
+    def create_column_block(self, content_blocks):
+        """
+        Create a column block with content
+        
+        Args:
+            content_blocks (list): List of blocks to put in the column
+            
+        Returns:
+            dict: Block data for column
+        """
+        return {
+            "object": "block",
+            "type": "column",
+            "column": {
+                "children": content_blocks
+            }
+        }
+    
     def create_bulleted_list_item_block(self, text):
         """
         Create a bulleted list item block data structure
@@ -575,6 +660,12 @@ class NotionWriter:
                 blocks.append(self.create_heading_block(line[3:], 2))
             elif line.startswith('# '):
                 blocks.append(self.create_heading_block(line[2:], 1))
+            # Handle special formatting
+            elif line.strip() == '---':
+                blocks.append(self.create_divider_block())
+            elif line.startswith('> '):
+                # Treat as callout
+                blocks.append(self.create_callout_block(line[2:], "📝", "gray_background"))
             # Handle bullet points
             elif line.startswith('- ') or line.startswith('• '):
                 blocks.append(self.create_bulleted_list_item_block(line[2:]))
@@ -584,7 +675,8 @@ class NotionWriter:
                 blocks.append(self.create_bulleted_list_item_block(text))
             # Regular paragraph
             else:
-                blocks.append(self.create_paragraph_block(line))
+                if line.strip():  # Only create non-empty paragraphs
+                    blocks.append(self.create_paragraph_block(line))
         
         return blocks
     
@@ -599,7 +691,13 @@ class NotionWriter:
             list: List of blocks that appear to be activities
         """
         def is_activity_block(block):
+            block_type = block.get('type')
             text_content = self._extract_plain_text_from_block(block)
+            
+            # Check for activity-related block types
+            if block_type in ['toggle', 'callout']:
+                return True  # These often contain activities
+            
             if not text_content:
                 return False
             
@@ -608,7 +706,10 @@ class NotionWriter:
             activity_indicators = [
                 'activity', 'exercise', 'discussion', 'group work', 
                 'practice', 'role play', 'simulation', 'workshop',
-                '👀', '🕺', '🎓'  # See, Do, Equip emojis
+                'introduction activity', 'discovery activity',
+                'minutes', 'debrief', 'see:', 'do:', 'equip:',
+                '👀', '🕺', '🎓',  # See, Do, Equip emojis
+                '🕰', '🗿', '🔬'  # Time, notes, microscope emojis
             ]
             
             return any(indicator in text_lower for indicator in activity_indicators)
@@ -672,13 +773,25 @@ class NotionWriter:
             
             # For now, we'll add a single cultural adaptations section at the end
             # since Notion API doesn't support inserting at specific positions easily
-            cultural_blocks = [
-                self.create_heading_block("Cultural Adaptations", 2),
-                self.create_toggle_block(
-                    "Cultural Considerations for Activities",
-                    self.parse_markdown_to_blocks(cultural_analysis)
-                )
-            ]
+            
+            # Parse cultural analysis and limit blocks to avoid API limits
+            cultural_content_blocks = self.parse_markdown_to_blocks(cultural_analysis)
+            
+            # Notion API limit: toggles can only have 100 children, so split if needed
+            if len(cultural_content_blocks) > 90:  # Keep some buffer
+                # Just add the heading and a summary paragraph instead
+                cultural_blocks = [
+                    self.create_heading_block("Cultural Adaptations", 2),
+                    self.create_paragraph_block("Cultural analysis generated. See full analysis in saved files.")
+                ]
+            else:
+                cultural_blocks = [
+                    self.create_heading_block("Cultural Adaptations", 2),
+                    self.create_toggle_block(
+                        "Cultural Considerations for Activities",
+                        cultural_content_blocks[:90]  # Limit to 90 blocks
+                    )
+                ]
             
             return self.append_blocks_to_page(page_id, cultural_blocks)
             
@@ -752,7 +865,12 @@ class NotionWriter:
                             enhanced_text = re.sub(r'^[\-\*]\s*', '', enhanced_text)
                             
                             if enhanced_text.strip():
-                                self.update_block_text(block['id'], enhanced_text.strip())
+                                # Trim text to fit Notion's 2000 character limit
+                                trimmed_text = enhanced_text.strip()[:1900]  # Leave buffer for safety
+                                if len(enhanced_text.strip()) > 1900:
+                                    trimmed_text += "..."
+                                
+                                self.update_block_text(block['id'], trimmed_text)
                                 updated_count += 1
                                 logging.info(f"📝 Updated block with enhanced content")
                 except Exception as e:

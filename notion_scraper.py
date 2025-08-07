@@ -203,7 +203,12 @@ def convert_to_markdown_enhanced(notion, page, blocks):
             
             elif block_type == 'synced_block':
                 markdown.append("<!-- Start Synced Block -->\n")
-                synced_from_id = block.get('synced_block', {}).get('synced_from', {}).get('block_id')
+                synced_block_data = block.get('synced_block', {})
+                if synced_block_data and 'synced_from' in synced_block_data:
+                    synced_from_data = synced_block_data.get('synced_from')
+                    synced_from_id = synced_from_data.get('block_id') if synced_from_data else None
+                else:
+                    synced_from_id = None
                 if synced_from_id:
                     synced_blocks = get_all_blocks_recursively(notion, synced_from_id)
                     synced_md, new_unknowns = convert_to_markdown_enhanced(notion, {}, synced_blocks)
@@ -248,8 +253,10 @@ def convert_to_markdown_enhanced(notion, page, blocks):
                 markdown.append(f"{row_text}\n")
 
             else:
-                unknown_block_types.add(block_type)
-                logging.warning(f"Skipping unknown block type: {block_type}")
+                # Don't warn about block types we now handle
+                if block_type not in ['column_list', 'column', 'toggle', 'callout', 'divider']:
+                    unknown_block_types.add(block_type)
+                    logging.warning(f"Skipping unknown block type: {block_type}")
 
         except Exception as e:
             logging.error(f"Error processing block {i} ({block_type}): {e}", exc_info=True)
