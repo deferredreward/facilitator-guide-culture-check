@@ -824,9 +824,53 @@ class NotionWriter:
         
         return blocks
     
+    def find_activity_toggle_blocks(self, page_id):
+        """
+        Find toggle blocks containing the word 'activity' - these contain cultural activities
+        
+        Args:
+            page_id (str): The Notion page ID
+            
+        Returns:
+            list: List of toggle blocks that contain activities
+        """
+        def is_activity_toggle(block):
+            if block.get('type') != 'toggle':
+                return False
+                
+            text_content = self._extract_plain_text_from_block(block)
+            if not text_content:
+                return False
+                
+            return 'activity' in text_content.lower()
+        
+        activity_toggles = self.find_blocks_by_criteria(page_id, is_activity_toggle)
+        logging.info(f"🌯 Found {len(activity_toggles)} activity toggle blocks")
+        
+        return activity_toggles
+    
+    def get_toggle_children(self, toggle_block_id):
+        """
+        Get children of a toggle block
+        
+        Args:
+            toggle_block_id (str): Toggle block ID
+            
+        Returns:
+            list: Child blocks of the toggle
+        """
+        try:
+            response = self.client.blocks.children.list(toggle_block_id)
+            children = response.get('results', [])
+            logging.info(f"📁 Toggle {toggle_block_id[:8]}... has {len(children)} children")
+            return children
+        except Exception as e:
+            logging.warning(f"⚠️ Could not get toggle children: {e}")
+            return []
+    
     def find_activity_blocks(self, page_id):
         """
-        Find blocks that represent activities (looking for activity markers)
+        Find blocks that represent activities (improved detection)
         
         Args:
             page_id (str): The Notion page ID
@@ -834,13 +878,23 @@ class NotionWriter:
         Returns:
             list: List of blocks that appear to be activities
         """
-        def is_activity_block(block):
+        all_activities = []
+        
+        # First, find activity toggle blocks and their children
+        activity_toggles = self.find_activity_toggle_blocks(page_id)
+        
+        for toggle in activity_toggles:
+            # Add the toggle itself
+            all_activities.append(toggle)
+            
+            # Add its children (these are the actual activities)
+            children = self.get_toggle_children(toggle['id'])
+            all_activities.extend(children)
+        
+        # Also find standalone activity blocks
+        def is_standalone_activity_block(block):
             block_type = block.get('type')
             text_content = self._extract_plain_text_from_block(block)
-            
-            # Check for activity-related block types
-            if block_type in ['toggle', 'callout']:
-                return True  # These often contain activities
             
             if not text_content:
                 return False
@@ -858,7 +912,19 @@ class NotionWriter:
             
             return any(indicator in text_lower for indicator in activity_indicators)
         
-        return self.find_blocks_by_criteria(page_id, is_activity_block)
+        standalone_activities = self.find_blocks_by_criteria(page_id, is_standalone_activity_block)
+        all_activities.extend(standalone_activities)
+        
+        # Remove duplicates
+        unique_activities = []
+        seen_ids = set()
+        for activity in all_activities:
+            if activity['id'] not in seen_ids:
+                unique_activities.append(activity)
+                seen_ids.add(activity['id'])
+        
+        logging.info(f"🎯 Found {len(unique_activities)} total activity blocks")
+        return unique_activities
     
     def insert_trainer_questions_section(self, page_id, questions_markdown):
         """
@@ -1043,3 +1109,262 @@ class NotionWriter:
                 'error': str(e),
                 'blocks_updated': 0
             }
+    
+    def intelligent_block_by_block_update(self, page_id, enhancement_prompt, ai_handler):
+        """
+        Update blocks one by one using AI for each block intelligently
+        
+        Args:
+            page_id (str): Notion page ID
+            enhancement_prompt (str): What enhancement to apply
+            ai_handler: AI handler for real-time assistance
+            
+        Returns:
+            dict: Results of intelligent updates
+        """
+        try:
+            # Get all blocks, skipping synced blocks
+            all_blocks = self._load_cached_blocks(page_id)
+            
+            if not all_blocks:
+                return {
+                    'success': False,
+                    'message': 'No cached blocks found',
+                    'blocks_updated': 0
+                }
+            
+            # Find updatable blocks (skip synced blocks!)
+            updatable_blocks = []
+            for block in all_blocks:
+                block_type = block.get('type')
+                
+                # Skip synced blocks and other problematic types
+                if block_type in ['synced_block', 'child_page', 'child_database', 'embed', 'file', 'image', 'video']:
+                    continue
+                    
+                if block_type in ['paragraph', 'heading_1', 'heading_2', 'heading_3', 
+                                'bulleted_list_item', 'numbered_list_item', 'quote', 'callout']:
+                    text_content = self._extract_plain_text_from_block(block)
+                    if text_content and len(text_content.strip()) > 15:  # Only meaningful content
+                        updatable_blocks.append(block)
+            
+            logging.info(f"🤖 Starting intelligent block-by-block update on {len(updatable_blocks)} blocks")
+            
+            successful_updates = 0
+            skipped_updates = 0
+            failed_updates = 0
+            
+            # Process blocks one by one with AI
+            for i, block in enumerate(updatable_blocks[:25]):  # Limit to prevent API overuse
+                try:
+                    logging.info(f"🔄 Processing block {i+1}/{len(updatable_blocks[:25])}: {block.get('type')}")
+                    
+                    result = self.intelligent_block_update(
+                        block['id'], 
+                        enhancement_prompt, 
+                        ai_handler
+                    )
+                    
+                    if result['success']:
+                        if result.get('skipped'):
+                            skipped_updates += 1
+                            logging.info(f"⏭️ Skipped block: {result.get('reason', 'Unknown')}")
+                        else:
+                            successful_updates += 1
+                            logging.info(f"✅ Enhanced block successfully")
+                    else:
+                        failed_updates += 1
+                        logging.warning(f"❌ Block update failed: {result.get('error', 'Unknown')}")
+                        
+                except Exception as e:
+                    failed_updates += 1
+                    logging.error(f"❌ Error processing block {i+1}: {e}")
+            
+            return {
+                'success': True,
+                'blocks_processed': len(updatable_blocks[:25]),
+                'successful_updates': successful_updates,
+                'skipped_updates': skipped_updates,
+                'failed_updates': failed_updates,
+                'message': f"Processed {len(updatable_blocks[:25])} blocks: {successful_updates} updated, {skipped_updates} skipped, {failed_updates} failed"
+            }
+            
+        except Exception as e:
+            logging.error(f"❌ Intelligent block update failed: {e}")
+            return {
+                'success': False,
+                'error': str(e),
+                'blocks_updated': 0
+            }
+    
+    def intelligent_block_update(self, block_id, enhancement_prompt, ai_handler):
+        """
+        Use AI to intelligently update a single block without destroying formatting
+        
+        Args:
+            block_id (str): Block ID to update
+            enhancement_prompt (str): What kind of enhancement to apply
+            ai_handler: AI handler for real-time assistance
+            
+        Returns:
+            dict: Update results
+        """
+        try:
+            # Get current block with full structure
+            current_block = self.client.blocks.retrieve(block_id)
+            block_type = current_block.get('type')
+            
+            # Extract current rich text structure
+            rich_text_array = self._get_rich_text_from_block(current_block, block_type)
+            
+            if not rich_text_array:
+                return {'success': False, 'error': 'No rich text content'}
+            
+            # Convert rich text to plain text for AI
+            current_plain_text = ''.join([rt.get('text', {}).get('content', '') for rt in rich_text_array])
+            
+            if len(current_plain_text.strip()) < 15:
+                return {'success': True, 'skipped': True, 'reason': 'Too short'}
+            
+            # Ask AI for enhancement
+            ai_prompt = f"""
+You are improving Notion content for better readability while preserving meaning.
+
+CURRENT BLOCK:
+Type: {block_type}
+Content: {current_plain_text}
+
+TASK: {enhancement_prompt}
+
+IMPORTANT: Return ONLY the improved text content. Do NOT add formatting markers like **bold** or *italic*. Keep the core meaning but make it clearer and more accessible.
+
+IMPROVED CONTENT:"""
+            
+            # Get AI enhancement
+            try:
+                enhanced_content = ai_handler.generate_content(ai_prompt)
+                
+                # Log AI interaction
+                from orchestrator import log_ai_interaction
+                log_ai_interaction(ai_prompt, enhanced_content, ai_handler.model_type, f"BLOCK_UPDATE_{block_type}")
+                
+                if not enhanced_content or len(enhanced_content.strip()) < 5:
+                    return {'success': False, 'error': 'Invalid AI response'}
+                
+                # Apply intelligent update
+                result = self._apply_intelligent_update(
+                    block_id, block_type, enhanced_content.strip(), 
+                    rich_text_array, current_plain_text, current_block
+                )
+                
+                return {
+                    'success': result,
+                    'original_length': len(current_plain_text),
+                    'enhanced_length': len(enhanced_content),
+                    'block_type': block_type
+                }
+                
+            except Exception as ai_error:
+                return {'success': False, 'error': f'AI error: {str(ai_error)}'}
+                
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+    
+    def _apply_intelligent_update(self, block_id, block_type, enhanced_text, original_rich_text, original_plain_text, current_block):
+        """
+        Apply the enhanced text while preserving as much structure as possible
+        """
+        try:
+            # Trim to API limits
+            if len(enhanced_text) > 1900:
+                enhanced_text = enhanced_text[:1900] + "..."
+            
+            # Create structure-aware rich text
+            enhanced_rich_text = self._create_smart_rich_text_structure(
+                enhanced_text, original_rich_text
+            )
+            
+            # Build update payload based on block type
+            update_data = self._build_update_payload(block_type, enhanced_rich_text, current_block)
+            
+            if not update_data:
+                return False
+            
+            # Apply the update
+            self.client.blocks.update(block_id, **update_data)
+            return True
+            
+        except Exception as e:
+            logging.error(f"❌ Intelligent update failed: {e}")
+            return False
+    
+    def _create_smart_rich_text_structure(self, enhanced_text, original_rich_text):
+        """
+        Create enhanced rich text that tries to preserve original formatting patterns
+        """
+        # Simple case: no original formatting
+        if len(original_rich_text) <= 1:
+            return [{"type": "text", "text": {"content": enhanced_text}}]
+        
+        # Check for meaningful formatting in original
+        formatted_parts = [
+            rt for rt in original_rich_text 
+            if rt.get('annotations') and any(rt['annotations'].values())
+        ]
+        
+        if not formatted_parts:
+            return [{"type": "text", "text": {"content": enhanced_text}}]
+        
+        # Try to preserve some formatting by applying it to key parts
+        result = []
+        words = enhanced_text.split()
+        
+        if len(words) >= 3 and formatted_parts:
+            # Apply formatting to first few words
+            first_part = ' '.join(words[:2])
+            rest_text = ' '.join(words[2:])
+            
+            result.append({
+                "type": "text",
+                "text": {"content": first_part},
+                "annotations": formatted_parts[0].get('annotations', {})
+            })
+            
+            if rest_text:
+                result.append({
+                    "type": "text",
+                    "text": {"content": " " + rest_text}
+                })
+        else:
+            result = [{"type": "text", "text": {"content": enhanced_text}}]
+        
+        return result
+    
+    def _build_update_payload(self, block_type, rich_text_array, current_block):
+        """
+        Build the appropriate update payload for the block type
+        """
+        if block_type == 'paragraph':
+            return {"paragraph": {"rich_text": rich_text_array}}
+        elif block_type.startswith('heading_'):
+            return {block_type: {"rich_text": rich_text_array}}
+        elif block_type == 'bulleted_list_item':
+            return {"bulleted_list_item": {"rich_text": rich_text_array}}
+        elif block_type == 'numbered_list_item':
+            return {"numbered_list_item": {"rich_text": rich_text_array}}
+        elif block_type == 'quote':
+            return {"quote": {"rich_text": rich_text_array}}
+        elif block_type == 'to_do':
+            checked = current_block.get('to_do', {}).get('checked', False)
+            return {"to_do": {"rich_text": rich_text_array, "checked": checked}}
+        elif block_type == 'callout':
+            callout_props = current_block.get('callout', {})
+            return {
+                "callout": {
+                    "rich_text": rich_text_array,
+                    "icon": callout_props.get('icon', {"type": "emoji", "emoji": "📝"}),
+                    "color": callout_props.get('color', "default")
+                }
+            }
+        
+        return None

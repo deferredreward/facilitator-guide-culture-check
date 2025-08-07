@@ -31,31 +31,44 @@ from ai_handler import AIHandler
 from file_finder import find_debug_file_by_page_id_only
 
 # Setup logging with file output
-def setup_logging():
-    """Setup logging to both console and file"""
+def setup_dual_logging():
+    """Setup dual logging: program operations + AI interactions"""
     # Create logs directory if it doesn't exist
     log_dir = Path("logs")
     log_dir.mkdir(exist_ok=True)
     
-    # Create timestamp for log file
+    # Create timestamp for log files
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_file = log_dir / f"orchestrator_{timestamp}.log"
+    program_log_file = log_dir / f"orchestrator_{timestamp}_program.log"
+    ai_log_file = log_dir / f"orchestrator_{timestamp}_ai_interactions.log"
     
-    # Configure logging
+    # Configure main program logging
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s - %(levelname)s - %(message)s',
         handlers=[
-            logging.FileHandler(log_file, encoding='utf-8'),
+            logging.FileHandler(program_log_file, encoding='utf-8'),
             logging.StreamHandler(sys.stdout)
         ]
     )
     
-    logging.info(f"📝 Logging to file: {log_file}")
-    return log_file
+    # Create separate AI interaction logger
+    ai_logger = logging.getLogger('ai_interactions')
+    ai_logger.setLevel(logging.INFO)
+    ai_handler = logging.FileHandler(ai_log_file, encoding='utf-8')
+    ai_handler.setFormatter(logging.Formatter('%(asctime)s - AI - %(message)s'))
+    ai_logger.addHandler(ai_handler)
+    
+    logging.info(f"📝 Program logging: {program_log_file}")
+    logging.info(f"🤖 AI interaction logging: {ai_log_file}")
+    
+    return program_log_file, ai_log_file
 
-# Setup logging
-log_file = setup_logging()
+# Setup dual logging
+program_log_file, ai_log_file = setup_dual_logging()
+
+# AI interaction logger
+ai_logger = logging.getLogger('ai_interactions')
 
 def extract_page_id_from_url(url_or_id):
     """
@@ -93,6 +106,15 @@ def extract_page_id_from_url(url_or_id):
     
     # If we can't extract, return as-is and let the API handle it
     return url_or_id.strip()
+
+def log_ai_interaction(prompt, response, model_type, operation):
+    """Log AI interactions separately"""
+    ai_logger.info(f"=== {operation.upper()} ===")
+    ai_logger.info(f"Model: {model_type}")
+    ai_logger.info(f"Prompt (first 200 chars): {prompt[:200]}...")
+    ai_logger.info(f"Response (first 500 chars): {response[:500]}...")
+    ai_logger.info(f"Full response length: {len(response)} characters")
+    ai_logger.info("=" * 60)
 
 class NotionOrchestrator:
     """Orchestrates the complete AI enhancement workflow"""
@@ -230,39 +252,110 @@ class NotionOrchestrator:
             }
     
     def _generate_and_insert_cultural_adaptations(self, page_id):
-        """Generate cultural adaptations and insert them after activities"""
+        """Generate cultural adaptations and insert them in activity toggle blocks"""
         try:
-            # Find and read markdown file
-            markdown_file = find_markdown_file(page_id)
-            if not markdown_file:
+            if self.dry_run:
+                logging.info("🔍 DRY RUN: Would find activity toggles and add cultural adaptations")
                 return {
-                    'success': False,
-                    'error': 'No markdown file found for page'
+                    'success': True,
+                    'content_generated': True,
+                    'insertion_result': {'success': True, 'message': 'DRY RUN', 'blocks_added': 0}
                 }
             
-            content = read_markdown_content(markdown_file)
-            if not content:
+            # Find activity toggle blocks specifically
+            activity_toggles = self.writer.find_activity_toggle_blocks(page_id)
+            
+            if not activity_toggles:
+                logging.warning("⚠️ No activity toggle blocks found - trying general approach")
+                # Fallback to general approach
+                markdown_file = find_markdown_file(page_id)
+                if markdown_file:
+                    content = read_markdown_content(markdown_file)
+                    if content:
+                        cultural_content = analyze_content_with_ai(content, self.ai_model)
+                        if cultural_content:
+                            log_ai_interaction(
+                                f"Analyze cultural activities in: {content[:200]}...",
+                                cultural_content, self.ai_model, "CULTURAL_ANALYSIS_FALLBACK"
+                            )
+                            insertion_result = self._insert_cultural_adaptations(page_id, cultural_content)
+                            return {
+                                'success': insertion_result['success'],
+                                'content_generated': True,
+                                'insertion_result': insertion_result
+                            }
+                
                 return {
                     'success': False,
-                    'error': 'Failed to read markdown content'
+                    'error': 'No activity blocks found and fallback failed'
                 }
             
-            # Generate cultural analysis
-            cultural_content = analyze_content_with_ai(content, self.ai_model)
+            # Process each activity toggle and its children
+            total_adaptations = 0
             
-            if not cultural_content:
-                return {
-                    'success': False,
-                    'error': 'Failed to generate cultural analysis'
-                }
-            
-            # Find activities and insert cultural adaptations
-            insertion_result = self._insert_cultural_adaptations(page_id, cultural_content)
+            for toggle in activity_toggles:
+                try:
+                    # Get toggle children (actual activities)
+                    children = self.writer.get_toggle_children(toggle['id'])
+                    
+                    if children:
+                        # Generate cultural analysis for this specific activity group
+                        activity_content = self.writer._extract_plain_text_from_block(toggle)
+                        for child in children[:5]:  # Limit to prevent overload
+                            child_content = self.writer._extract_plain_text_from_block(child)
+                            activity_content += "\n" + child_content
+                        
+                        if len(activity_content.strip()) > 50:
+                            cultural_prompt = f"""
+Analyze this specific activity for cultural appropriateness and provide adaptation suggestions:
+
+ACTIVITY:
+{activity_content}
+
+Provide brief, practical cultural adaptation suggestions focusing on:
+1. Power distance considerations
+2. Individual vs collective approaches
+3. Communication style adaptations
+4. Time orientation adjustments
+
+Keep suggestions concise and actionable."""
+                            
+                            try:
+                                cultural_analysis = self.ai_handler.generate_content(cultural_prompt)
+                                log_ai_interaction(cultural_prompt, cultural_analysis, self.ai_model, "CULTURAL_ANALYSIS_SPECIFIC")
+                                
+                                if cultural_analysis:
+                                    # Add cultural adaptation as a child of the toggle
+                                    adaptation_blocks = [
+                                        self.writer.create_callout_block(
+                                            f"Cultural Adaptations: {cultural_analysis[:500]}...",
+                                            "🌍", "blue_background"
+                                        )
+                                    ]
+                                    
+                                    result = self.writer.client.blocks.children.append(
+                                        toggle['id'], children=adaptation_blocks
+                                    )
+                                    
+                                    if result:
+                                        total_adaptations += 1
+                                        logging.info(f"✅ Added cultural adaptation to toggle {toggle['id'][:8]}...")
+                                        
+                            except Exception as e:
+                                logging.warning(f"⚠️ Could not add cultural adaptation: {e}")
+                                
+                except Exception as e:
+                    logging.warning(f"⚠️ Error processing activity toggle: {e}")
             
             return {
-                'success': insertion_result['success'],
-                'content_generated': bool(cultural_content),
-                'insertion_result': insertion_result
+                'success': total_adaptations > 0,
+                'content_generated': True,
+                'adaptations_added': total_adaptations,
+                'insertion_result': {
+                    'success': total_adaptations > 0,
+                    'message': f"Added {total_adaptations} cultural adaptations to activity toggles",
+                    'blocks_added': total_adaptations
+                }
             }
             
         except Exception as e:
@@ -273,50 +366,41 @@ class NotionOrchestrator:
             }
     
     def _enhance_readability(self, page_id):
-        """Enhance readability of the entire page"""
+        """Enhance readability using intelligent block-by-block AI updates"""
         try:
-            # Find and read markdown file
-            markdown_file = find_markdown_file(page_id)
-            if not markdown_file:
-                return {
-                    'success': False,
-                    'error': 'No markdown file found for page'
-                }
-            
-            content = read_markdown_content(markdown_file)
-            if not content:
-                return {
-                    'success': False,
-                    'error': 'Failed to read markdown content'
-                }
-            
-            # Generate enhanced content
-            enhanced_content = enhance_content_with_ai(content, self.ai_model)
-            
-            if not enhanced_content:
-                return {
-                    'success': False,
-                    'error': 'Failed to enhance readability'
-                }
-            
-            # Apply reading enhancements using the enhanced writer
             if self.dry_run:
-                logging.info("🔍 DRY RUN: Would update blocks with enhanced reading content")
-                application_result = {
+                logging.info("🔍 DRY RUN: Would perform intelligent block-by-block reading enhancement")
+                return {
                     'success': True,
+                    'content_generated': True,
+                    'applied': False,
                     'blocks_updated': 0,
-                    'message': 'DRY RUN: Would update content with enhanced reading'
+                    'message': 'DRY RUN: Would enhance readability intelligently'
                 }
-            else:
-                application_result = self.writer.update_specific_blocks_with_enhanced_content(
-                    page_id, enhanced_content
-                )
+            
+            # Use new intelligent block-by-block updating
+            enhancement_prompt = """Make this content more accessible for ESL (English as Second Language) readers at an 8th-grade reading level. 
+            
+            Guidelines:
+            - Use simpler vocabulary where possible
+            - Make shorter, clearer sentences
+            - Keep the original meaning intact
+            - Use active voice instead of passive
+            - Add clarity without changing technical terms
+            - Make instructions more step-by-step"""
+            
+            application_result = self.writer.intelligent_block_by_block_update(
+                page_id, enhancement_prompt, self.ai_handler
+            )
             
             return {
                 'success': application_result['success'],
-                'content_generated': bool(enhanced_content),
-                'applied': not self.dry_run,
-                'blocks_updated': application_result.get('blocks_updated', 0),
+                'content_generated': True,
+                'applied': True,
+                'blocks_processed': application_result.get('blocks_processed', 0),
+                'successful_updates': application_result.get('successful_updates', 0),
+                'skipped_updates': application_result.get('skipped_updates', 0),
+                'failed_updates': application_result.get('failed_updates', 0),
                 'application_result': application_result
             }
             
