@@ -299,16 +299,25 @@ class NotionOrchestrator:
                     'error': 'Failed to enhance readability'
                 }
             
-            # Apply reading enhancements (this would replace content)
-            # Note: This is complex and may require careful block-by-block replacement
-            # For now, we'll log that this step needs implementation
-            logging.warning("📚 Reading enhancement generated but replacement logic needs implementation")
+            # Apply reading enhancements using the enhanced writer
+            if self.dry_run:
+                logging.info("🔍 DRY RUN: Would update blocks with enhanced reading content")
+                application_result = {
+                    'success': True,
+                    'blocks_updated': 0,
+                    'message': 'DRY RUN: Would update content with enhanced reading'
+                }
+            else:
+                application_result = self.writer.update_specific_blocks_with_enhanced_content(
+                    page_id, enhanced_content
+                )
             
             return {
-                'success': True,
+                'success': application_result['success'],
                 'content_generated': bool(enhanced_content),
-                'applied': False,  # Not yet implemented
-                'note': 'Reading enhancement generated but not applied - needs implementation'
+                'applied': not self.dry_run,
+                'blocks_updated': application_result.get('blocks_updated', 0),
+                'application_result': application_result
             }
             
         except Exception as e:

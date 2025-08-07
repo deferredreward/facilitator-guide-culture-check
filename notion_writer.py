@@ -689,3 +689,85 @@ class NotionWriter:
                 'error': str(e),
                 'blocks_added': 0
             }
+    
+    def update_specific_blocks_with_enhanced_content(self, page_id, enhanced_markdown):
+        """
+        Update specific blocks with enhanced content (safer approach)
+        
+        Args:
+            page_id (str): The Notion page ID
+            enhanced_markdown (str): Enhanced markdown content
+            
+        Returns:
+            dict: Results of the update operation
+        """
+        try:
+            # Get all current blocks
+            all_blocks = self._load_cached_blocks(page_id)
+            
+            if not all_blocks:
+                return {
+                    'success': False,
+                    'message': 'No cached blocks found',
+                    'blocks_updated': 0
+                }
+            
+            # Parse enhanced content into sections
+            enhanced_lines = enhanced_markdown.split('\n')
+            enhanced_sections = []
+            current_section = []
+            
+            for line in enhanced_lines:
+                if line.strip().startswith('#') and current_section:
+                    enhanced_sections.append('\n'.join(current_section))
+                    current_section = [line]
+                else:
+                    current_section.append(line)
+            
+            if current_section:
+                enhanced_sections.append('\n'.join(current_section))
+            
+            # Find updatable text blocks and update them with enhanced content
+            updatable_blocks = []
+            for block in all_blocks:
+                block_type = block.get('type')
+                if block_type in ['paragraph', 'heading_1', 'heading_2', 'heading_3', 
+                                'bulleted_list_item', 'numbered_list_item']:
+                    text_content = self._extract_plain_text_from_block(block)
+                    if text_content and len(text_content.strip()) > 10:  # Only meaningful content
+                        updatable_blocks.append(block)
+            
+            updated_count = 0
+            # Update blocks with enhanced content (match by position/similarity)
+            for i, block in enumerate(updatable_blocks[:min(len(enhanced_sections), 20)]):  # Limit updates
+                try:
+                    if i < len(enhanced_sections):
+                        enhanced_section = enhanced_sections[i].strip()
+                        if enhanced_section:
+                            # Extract just the text part (remove markdown formatting)
+                            enhanced_text = enhanced_section
+                            # Remove markdown headers
+                            enhanced_text = re.sub(r'^#+\s*', '', enhanced_text)
+                            # Remove bullet points
+                            enhanced_text = re.sub(r'^[\-\*]\s*', '', enhanced_text)
+                            
+                            if enhanced_text.strip():
+                                self.update_block_text(block['id'], enhanced_text.strip())
+                                updated_count += 1
+                                logging.info(f"📝 Updated block with enhanced content")
+                except Exception as e:
+                    logging.warning(f"⚠️ Could not update block {block['id']}: {e}")
+            
+            return {
+                'success': True,
+                'blocks_updated': updated_count,
+                'message': f"Updated {updated_count} blocks with enhanced reading content"
+            }
+            
+        except Exception as e:
+            logging.error(f"❌ Error updating blocks with enhanced content: {e}")
+            return {
+                'success': False,
+                'error': str(e),
+                'blocks_updated': 0
+            }
