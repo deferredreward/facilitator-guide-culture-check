@@ -18,6 +18,7 @@ from dotenv import load_dotenv
 from ai_handler import create_ai_handler
 from markdown_utils import clean_markdown_content
 from file_finder import find_markdown_file_by_page_id
+import re
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -76,32 +77,68 @@ def read_markdown_content(file_path):
         logging.error(f"❌ Error reading markdown file: {e}")
         return None
 
+def load_reading_prompt_from_txt(path: str = "prompts.txt") -> str:
+    """Load the Reading prompt (with {content}) from prompts.txt."""
+    try:
+        text = Path(path).read_text(encoding="utf-8")
+    except Exception:
+        # Fallback to a safe generic prompt with {content}
+        return (
+            "You are an expert in making technical and educational content more accessible to non-native English speakers who have an 8th-grade education level.\n\n"
+            "Please directly edit and improve the following markdown content to make it easier to understand for someone whose English is their 2nd, 3rd, or 4th language. Edit the text in place, do not use curly brackets or any other markers for suggestions—just make the changes directly.\n\n"
+            "IMPORTANT GUIDELINES:\n"
+            "1. DO NOT change key terms, especially single terms on bullet point lines\n"
+            "2. DO NOT change technical terms that are essential to the content\n"
+            "3. DO NOT change proper nouns, names, or specific terminology\n"
+            "4. Edit the main body content directly, making it more readable and accessible\n"
+            "5. Focus on:\n"
+            "   - Simplifying complex sentence structures\n"
+            "   - Using shorter, clearer sentences\n"
+            "   - Replacing difficult words with simpler alternatives\n"
+            "   - Adding clarifying phrases where needed\n"
+            "   - Making instructions more step-by-step\n"
+            "   - Using active voice instead of passive voice\n\n"
+            "Here's the content to enhance:\n\n{content}\n\n"
+            "Please return the improved content, keeping the original markdown formatting intact."
+        )
+
+    start_idx = text.find("# Reading:")
+    if start_idx == -1:
+        return ""
+    section = text[start_idx:]
+    q1 = section.find('"""')
+    if q1 == -1:
+        return ""
+    q2 = section.find('"""', q1 + 3)
+    if q2 == -1:
+        return ""
+    return section[q1 + 3:q2].strip()
+
+
+def get_block_level_reading_instructions(path: str = "prompts.txt") -> str:
+    """Return Reading instructions with the {content} section removed (for per-block use)."""
+    prompt = load_reading_prompt_from_txt(path)
+    if not prompt:
+        return (
+            "You are an expert in making technical and educational content more accessible to non-native English "
+            "speakers who have an 8th-grade education level. Edit the text directly, keep formatting, preserve key "
+            "terms and proper nouns, simplify sentences, and use active voice."
+        )
+    # Remove the content insertion block
+    prompt = re.sub(
+        r"(?ms)^\s*Here\'s the content to enhance:\s*\n\s*\{content\}\s*\n",
+        "",
+        prompt,
+    )
+    return prompt.strip()
+
+
 def get_ai_enhancement_prompt(content):
-    """Create the prompt for AI readability enhancement (edit in place, no curly brackets)"""
-    prompt = f"""You are an expert in making technical and educational content more accessible to non-native English speakers who have an 8th-grade education level.
-
-Please directly edit and improve the following markdown content to make it easier to understand for someone whose English is their 2nd, 3rd, or 4th language. Edit the text in place, do not use curly brackets or any other markers for suggestions—just make the changes directly.
-
-IMPORTANT GUIDELINES:
-1. DO NOT change key terms, especially single terms on bullet point lines
-2. DO NOT change technical terms that are essential to the content
-3. DO NOT change proper nouns, names, or specific terminology
-4. Edit the main body content directly, making it more readable and accessible
-5. Focus on:
-   - Simplifying complex sentence structures
-   - Using shorter, clearer sentences
-   - Replacing difficult words with simpler alternatives
-   - Adding clarifying phrases where needed
-   - Making instructions more step-by-step
-   - Using active voice instead of passive voice
-
-Here's the content to enhance:
-
-{content}
-
-Please return the improved content, keeping the original markdown formatting intact."""
-    
-    return prompt
+    """Create the prompt for AI readability enhancement by loading it from prompts.txt and inserting content."""
+    base = load_reading_prompt_from_txt()
+    if not base:
+        base = "Please improve the following content for ESL learners while preserving markdown formatting.\n\n{content}"
+    return base.replace("{content}", content)
 
 def enhance_content_with_ai(content, ai_choice):
     """Enhance content using the shared AI handler"""

@@ -25,7 +25,7 @@ from datetime import datetime
 from notion_scraper import test_notion_api
 from ai_question_generator import generate_questions_with_ai, find_markdown_file, read_markdown_content
 from cultural_activity_analyzer import analyze_content_with_ai
-from ai_reading_enhancer import enhance_content_with_ai
+from ai_reading_enhancer import enhance_content_with_ai, get_block_level_reading_instructions
 from notion_writer import NotionWriter
 from ai_handler import AIHandler
 from file_finder import find_debug_file_by_page_id_only
@@ -130,6 +130,59 @@ def log_ai_interaction(prompt, response, model_type, operation):
     except Exception as e:
         logging.error(f"Failed to log AI interaction: {e}")
 
+def load_reading_prompt_from_txt(path: str = "prompts.txt") -> str:
+    """Extract the Reading prompt from prompts.txt and adapt it for block-level use.
+
+    We load the triple-quoted string under the '# Reading:' section and remove
+    the '{content}' placeholder block, since the block content is injected elsewhere.
+    """
+    try:
+        p = Path(path)
+        text = p.read_text(encoding="utf-8")
+    except Exception:
+        # Fallback to a minimal safe prompt
+        return (
+            "You are an expert in making technical and educational content more accessible "
+            "to non-native English speakers at an 8th-grade level. Improve clarity and readability "
+            "without changing technical terms or key nouns. Use shorter sentences and active voice."
+        )
+
+    # Locate the Reading section
+    start_idx = text.find("# Reading:")
+    if start_idx == -1:
+        return (
+            "You are an expert in making technical and educational content more accessible "
+            "to non-native English speakers at an 8th-grade level. Improve clarity and readability "
+            "without changing technical terms or key nouns. Use shorter sentences and active voice."
+        )
+
+    section = text[start_idx:]
+    # Find the first triple quote after the section header
+    q1 = section.find('"""')
+    if q1 == -1:
+        return (
+            "You are an expert in making technical and educational content more accessible "
+            "to non-native English speakers at an 8th-grade level. Improve clarity and readability "
+            "without changing technical terms or key nouns. Use shorter sentences and active voice."
+        )
+    q2 = section.find('"""', q1 + 3)
+    if q2 == -1:
+        return (
+            "You are an expert in making technical and educational content more accessible "
+            "to non-native English speakers at an 8th-grade level. Improve clarity and readability "
+            "without changing technical terms or key nouns. Use shorter sentences and active voice."
+        )
+    extracted = section[q1 + 3:q2]
+
+    # Remove the '{content}' insertion block and its header line
+    import re
+    extracted = re.sub(
+        r"(?ms)^\s*Here\'s the content to enhance:\s*\n\s*\{content\}\s*\n",
+        "",
+        extracted,
+    )
+    return extracted.strip()
+
 class NotionOrchestrator:
     """Orchestrates the complete AI enhancement workflow"""
     
@@ -193,9 +246,14 @@ class NotionOrchestrator:
             workflow_results['steps']['reading'] = reading_result
             
             # Overall success
-            workflow_results['success'] = all(
-                result.get('success', False) for result in workflow_results['steps'].values()
-            )
+            # Consider success only if reading step updated any blocks or culture inserted any blocks
+            reading = workflow_results['steps'].get('reading', {})
+            culture = workflow_results['steps'].get('culture', {})
+            any_updates = (reading.get('successful_updates', 0) > 0) or (culture.get('adaptations_added', 0) > 0)
+            all_steps_ok = all(result.get('success', False) for result in workflow_results['steps'].values())
+            workflow_results['success'] = all_steps_ok and any_updates
+            if not any_updates:
+                logging.warning("⚠️ No updates were applied (0 successful updates, 0 cultural insertions)")
             
             logging.info(f"✅ Workflow completed. Overall success: {workflow_results['success']}")
             return workflow_results
@@ -276,99 +334,68 @@ class NotionOrchestrator:
                     'insertion_result': {'success': True, 'message': 'DRY RUN', 'blocks_added': 0}
                 }
             
-            # Find activity toggle blocks specifically
-            activity_toggles = self.writer.find_activity_toggle_blocks(page_id)
-            
-            if not activity_toggles:
-                logging.warning("⚠️ No activity toggle blocks found - trying general approach")
-                # Fallback to general approach
+            # Build activity sections (toggles and headings)
+            sections = self.writer.find_activity_sections(page_id)
+            if not sections:
+                # Fallback to page-level cultural analysis and append at end
+                logging.warning("⚠️ No specific activity sections found; computing page-level cultural analysis")
                 markdown_file = find_markdown_file(page_id)
-                if markdown_file:
-                    content = read_markdown_content(markdown_file)
-                    if content:
-                        cultural_content = analyze_content_with_ai(content, self.ai_model)
-                        if cultural_content:
-                            log_ai_interaction(
-                                f"Analyze cultural activities in: {content[:200]}...",
-                                cultural_content, self.ai_model, "CULTURAL_ANALYSIS_FALLBACK"
-                            )
-                            insertion_result = self._insert_cultural_adaptations(page_id, cultural_content)
-                            return {
-                                'success': insertion_result['success'],
-                                'content_generated': True,
-                                'insertion_result': insertion_result
-                            }
-                
+                if not markdown_file:
+                    return {'success': False, 'error': 'No markdown file for fallback'}
+                content = read_markdown_content(markdown_file)
+                if not content:
+                    return {'success': False, 'error': 'Failed to read markdown for fallback'}
+                cultural_content = analyze_content_with_ai(content, self.ai_model)
+                if not cultural_content:
+                    return {'success': False, 'error': 'Cultural analysis failed'}
+                insertion_result = self._insert_cultural_adaptations(page_id, cultural_content)
                 return {
-                    'success': False,
-                    'error': 'No activity blocks found and fallback failed'
+                    'success': insertion_result['success'],
+                    'content_generated': True,
+                    'insertion_result': insertion_result
                 }
             
-            # Process each activity toggle and its children
-            total_adaptations = 0
-            
-            for toggle in activity_toggles:
+            total_added = 0
+            for sec in sections:
                 try:
-                    # Get toggle children (actual activities)
-                    children = self.writer.get_toggle_children(toggle['id'])
-                    
-                    if children:
-                        # Generate cultural analysis for this specific activity group
-                        activity_content = self.writer._extract_plain_text_from_block(toggle)
-                        for child in children[:5]:  # Limit to prevent overload
-                            child_content = self.writer._extract_plain_text_from_block(child)
-                            activity_content += "\n" + child_content
-                        
-                        if len(activity_content.strip()) > 50:
-                            cultural_prompt = f"""
-Analyze this specific activity for cultural appropriateness and provide adaptation suggestions:
-
-ACTIVITY:
-{activity_content}
-
-Provide brief, practical cultural adaptation suggestions focusing on:
-1. Power distance considerations
-2. Individual vs collective approaches
-3. Communication style adaptations
-4. Time orientation adjustments
-
-Keep suggestions concise and actionable."""
-                            
-                            try:
-                                cultural_analysis = self.ai_handler.get_response(cultural_prompt)
-                                log_ai_interaction(cultural_prompt, cultural_analysis, self.ai_model, "CULTURAL_ANALYSIS_SPECIFIC")
-                                
-                                if cultural_analysis:
-                                    # Add cultural adaptation as a child of the toggle
-                                    adaptation_blocks = [
-                                        self.writer.create_callout_block(
-                                            f"Cultural Adaptations: {cultural_analysis[:500]}...",
-                                            "🌍", "blue_background"
-                                        )
-                                    ]
-                                    
-                                    result = self.writer.client.blocks.children.append(
-                                        toggle['id'], children=adaptation_blocks
-                                    )
-                                    
-                                    if result:
-                                        total_adaptations += 1
-                                        logging.info(f"✅ Added cultural adaptation to toggle {toggle['id'][:8]}...")
-                                        
-                            except Exception as e:
-                                logging.warning(f"⚠️ Could not add cultural adaptation: {e}")
-                                
+                    if len(sec['content_text']) < 50:
+                        continue
+                    # Load cultural prompt template from prompts.txt (Culture section)
+                    try:
+                        txt = Path('prompts.txt').read_text(encoding='utf-8')
+                        start = txt.find('# Culture:')
+                        q1 = txt.find('"""', start)
+                        q2 = txt.find('"""', q1 + 3) if q1 != -1 else -1
+                        culture_template = txt[q1 + 3:q2] if q1 != -1 and q2 != -1 else None
+                    except Exception:
+                        culture_template = None
+                    if not culture_template:
+                        # Minimal fallback
+                        culture_template = (
+                            "Analyze the activity below for cultural appropriateness. Provide brief adaptations and alternatives.\n\n{content}"
+                        )
+                    prompt = culture_template.replace('{content}', sec['content_text'])
+                    analysis = self.ai_handler.get_response(prompt, max_tokens=3000, temperature=0.4)
+                    log_ai_interaction(prompt, analysis or '', self.ai_model, 'CULTURAL_ACTIVITY')
+                    if not analysis:
+                        continue
+                    title = f"🌍 Cultural guidance for: {sec['label'][:60]}"
+                    append_res = self.writer.append_cultural_toggle_to_container(
+                        sec['container_id'], title, analysis, max_blocks=40
+                    )
+                    if append_res.get('success') and not append_res.get('skipped'):
+                        total_added += 1
                 except Exception as e:
-                    logging.warning(f"⚠️ Error processing activity toggle: {e}")
+                    logging.warning(f"⚠️ Failed to append cultural guidance: {e}")
             
             return {
-                'success': total_adaptations > 0,
+                'success': total_added > 0,
                 'content_generated': True,
-                'adaptations_added': total_adaptations,
+                'adaptations_added': total_added,
                 'insertion_result': {
-                    'success': total_adaptations > 0,
-                    'message': f"Added {total_adaptations} cultural adaptations to activity toggles",
-                    'blocks_added': total_adaptations
+                    'success': total_added > 0,
+                    'message': f"Added {total_added} cultural guidance toggles",
+                    'blocks_added': total_added
                 }
             }
             
@@ -392,16 +419,8 @@ Keep suggestions concise and actionable."""
                     'message': 'DRY RUN: Would enhance readability intelligently'
                 }
             
-            # Use new intelligent block-by-block updating
-            enhancement_prompt = """Make this content more accessible for ESL (English as Second Language) readers at an 8th-grade reading level. 
-            
-            Guidelines:
-            - Use simpler vocabulary where possible
-            - Make shorter, clearer sentences
-            - Keep the original meaning intact
-            - Use active voice instead of passive
-            - Add clarity without changing technical terms
-            - Make instructions more step-by-step"""
+            # Use Reading prompt from prompts.txt (block-level instructions)
+            enhancement_prompt = get_block_level_reading_instructions()
             
             application_result = self.writer.intelligent_block_by_block_update(
                 page_id, enhancement_prompt, self.ai_handler
@@ -500,17 +519,44 @@ def main():
                       help='AI model to use (default: claude)')
     parser.add_argument('--dry-run', action='store_true',
                       help='Show what would be done without making changes')
+    parser.add_argument('--only', choices=['scrape', 'questions', 'culture', 'reading'],
+                      help='Run only a specific step instead of the full workflow')
     
     args = parser.parse_args()
     
     # Extract clean page ID from URL if needed
     clean_page_id = extract_page_id_from_url(args.page_id)
-    logging.info(f"📋 Input: {args.page_id}")
+    logging.info(f"�� Input: {args.page_id}")
     logging.info(f"🎯 Extracted Page ID: {clean_page_id}")
     
     # Initialize orchestrator
     orchestrator = NotionOrchestrator(ai_model=args.ai, dry_run=args.dry_run)
     
+    # Run single step if requested
+    if args.only:
+        step = args.only
+        if step == 'scrape':
+            res = orchestrator._scrape_page(clean_page_id)
+        elif step == 'questions':
+            res = orchestrator._generate_and_insert_questions(clean_page_id)
+        elif step == 'culture':
+            res = orchestrator._generate_and_insert_cultural_adaptations(clean_page_id)
+        else:  # reading
+            res = orchestrator._enhance_readability(clean_page_id)
+
+        print("\n" + "="*60)
+        print(f"🎯 STEP RESULT: {step.upper()}")
+        print("="*60)
+        status = "✅" if res.get('success') else "❌"
+        print(f"Status: {status}")
+        if 'message' in res:
+            print(f"Message: {res['message']}")
+        if step == 'culture':
+            print(f"Adaptations added: {res.get('adaptations_added', 0)}")
+        if step == 'reading':
+            print(f"Successful updates: {res.get('successful_updates', 0)}")
+        sys.exit(0 if res.get('success') else 1)
+
     # Run complete workflow
     results = orchestrator.run_complete_workflow(clean_page_id)
     

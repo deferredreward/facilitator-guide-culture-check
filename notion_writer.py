@@ -14,6 +14,7 @@ from pathlib import Path
 from notion_client import Client
 from dotenv import load_dotenv
 from file_finder import find_debug_file_by_page_id_only
+import time
 
 # Load environment variables
 load_dotenv()
@@ -144,6 +145,18 @@ class NotionWriter:
             rich_text = block.get('callout', {}).get('rich_text', [])
         elif block_type == 'toggle':
             rich_text = block.get('toggle', {}).get('rich_text', [])
+        elif block_type == 'image':
+            rich_text = block.get('image', {}).get('caption', [])
+        elif block_type == 'video':
+            rich_text = block.get('video', {}).get('caption', [])
+        elif block_type == 'file':
+            rich_text = block.get('file', {}).get('caption', [])
+        elif block_type == 'pdf':
+            rich_text = block.get('pdf', {}).get('caption', [])
+        elif block_type == 'audio':
+            rich_text = block.get('audio', {}).get('caption', [])
+        elif block_type == 'bookmark':
+            rich_text = block.get('bookmark', {}).get('caption', [])
         else:
             return ""
         
@@ -175,6 +188,18 @@ class NotionWriter:
             return block.get('callout', {}).get('rich_text', [])
         elif block_type == 'toggle':
             return block.get('toggle', {}).get('rich_text', [])
+        elif block_type == 'image':
+            return block.get('image', {}).get('caption', [])
+        elif block_type == 'video':
+            return block.get('video', {}).get('caption', [])
+        elif block_type == 'file':
+            return block.get('file', {}).get('caption', [])
+        elif block_type == 'pdf':
+            return block.get('pdf', {}).get('caption', [])
+        elif block_type == 'audio':
+            return block.get('audio', {}).get('caption', [])
+        elif block_type == 'bookmark':
+            return block.get('bookmark', {}).get('caption', [])
         return []
     
     def _map_enhanced_text_to_structure(self, enhanced_text, existing_rich_text, original_text):
@@ -407,6 +432,16 @@ class NotionWriter:
             else:
                 raise ValueError(f"Unsupported block type for updating: {block_type}")
             
+            # HARD GUARD: never modify synced blocks or their children
+            try:
+                if block_type == 'synced_block' or self._is_block_or_ancestor_synced_api(block_id):
+                    logging.warning(f"🚫 PROTECTED: Skipping update for synced content {block_id[:8]}...")
+                    return {"skipped": True, "reason": "Synced content"}
+            except Exception:
+                # If guard fails, be conservative and skip
+                logging.warning(f"⚠️ Guard failed, conservatively skipping block {block_id[:8]}")
+                return {"skipped": True, "reason": "Guard failure"}
+
             # Update the block
             response = self.client.blocks.update(block_id, **update_data)
             logging.info(f"✅ Block {block_id} updated successfully")
@@ -754,7 +789,7 @@ class NotionWriter:
             }
         }
     
-    def create_bulleted_list_item_block(self, text):
+    def create_bulleted_list_item_block(self, text, rich_text=None):
         """
         Create a bulleted list item block data structure
         
@@ -764,21 +799,56 @@ class NotionWriter:
         Returns:
             dict: Block data for bulleted list item
         """
+        if rich_text is None:
+            rich_text = [
+                {
+                    "type": "text",
+                    "text": {
+                        "content": text
+                    }
+                }
+            ]
         return {
             "object": "block",
             "type": "bulleted_list_item",
             "bulleted_list_item": {
-                "rich_text": [
-                    {
-                        "type": "text",
-                        "text": {
-                            "content": text
-                        }
-                    }
-                ]
+                "rich_text": rich_text
             }
         }
     
+    def _markdown_to_rich_text(self, text: str):
+        """Convert simple markdown (**bold**, *italic*, `code`) to Notion rich_text array."""
+        parts = re.split(r"(\*\*.*?\*\*|\*.*?\*|`.*?`)", text)
+        rich = []
+        for part in parts:
+            if not part:
+                continue
+            ann = {
+                'bold': False,
+                'italic': False,
+                'strikethrough': False,
+                'underline': False,
+                'code': False,
+                'color': 'default'
+            }
+            content = part
+            if part.startswith('**') and part.endswith('**') and len(part) >= 4:
+                content = part[2:-2]
+                ann['bold'] = True
+            elif part.startswith('`') and part.endswith('`') and len(part) >= 2:
+                content = part[1:-1]
+                ann['code'] = True
+            elif part.startswith('*') and part.endswith('*') and len(part) >= 2:
+                content = part[1:-1]
+                ann['italic'] = True
+            if content:
+                rich.append({
+                    'type': 'text',
+                    'text': {'content': content},
+                    'annotations': ann
+                })
+        return rich if rich else [{"type": "text", "text": {"content": text}}]
+
     def parse_markdown_to_blocks(self, markdown_text):
         """
         Parse markdown text into Notion block structures
@@ -811,16 +881,29 @@ class NotionWriter:
                 # Treat as callout
                 blocks.append(self.create_callout_block(line[2:], "📝", "gray_background"))
             # Handle bullet points
-            elif line.startswith('- ') or line.startswith('• '):
-                blocks.append(self.create_bulleted_list_item_block(line[2:]))
+            elif line.startswith('- ') or line.startswith('• ') or line.startswith('* '):
+                content = line[2:]
+                # If bullet is just a bold label like **Cultural Strengths:**, make it a heading
+                m = re.match(r"^\*\*(.+?)\*\*:?$", content)
+                if m:
+                    blocks.append(self.create_heading_block(m.group(1), 3))
+                else:
+                    rich = self._markdown_to_rich_text(content)
+                    blocks.append(self.create_bulleted_list_item_block(content, rich_text=rich))
             # Handle numbered lists (convert to bullets for simplicity)
             elif re.match(r'^\d+\. ', line):
                 text = line.split('. ', 1)[1] if '. ' in line else line
-                blocks.append(self.create_bulleted_list_item_block(text))
+                rich = self._markdown_to_rich_text(text)
+                blocks.append(self.create_bulleted_list_item_block(text, rich_text=rich))
             # Regular paragraph
             else:
                 if line.strip():  # Only create non-empty paragraphs
-                    blocks.append(self.create_paragraph_block(line))
+                    rich = self._markdown_to_rich_text(line)
+                    blocks.append({
+                        "object": "block",
+                        "type": "paragraph",
+                        "paragraph": {"rich_text": rich}
+                    })
         
         return blocks
     
@@ -848,6 +931,123 @@ class NotionWriter:
         logging.info(f"🌯 Found {len(activity_toggles)} activity toggle blocks")
         
         return activity_toggles
+
+    def _heading_level_from_type(self, block_type: str) -> int:
+        if block_type == 'heading_1':
+            return 1
+        if block_type == 'heading_2':
+            return 2
+        if block_type == 'heading_3':
+            return 3
+        return 99
+
+    def find_activity_heading_blocks(self, page_id):
+        """Find heading blocks whose text contains 'activity' (case-insensitive)."""
+        def is_activity_heading(block):
+            btype = block.get('type')
+            if not btype or not btype.startswith('heading_'):
+                return False
+            text = self._extract_plain_text_from_block(block) or ''
+            return 'activity' in text.lower()
+        return self.find_blocks_by_criteria(page_id, is_activity_heading)
+
+    def find_activity_sections(self, page_id):
+        """Build activity sections from toggles and headings.
+
+        Returns a list of dicts: { 'container_id': str, 'label': str, 'content_text': str }
+        where container_id is where we can append a cultural guidance toggle.
+        """
+        sections = []
+        all_blocks = self._load_cached_blocks(page_id) or []
+
+        # 1) Toggle-based activities
+        for toggle in self.find_activity_toggle_blocks(page_id):
+            try:
+                if self._is_block_in_synced_content(toggle, all_blocks):
+                    continue
+                label = self._extract_plain_text_from_block(toggle) or 'Activity'
+                content_text = label
+                for child in self.get_toggle_children(toggle['id'])[:20]:
+                    content_text += "\n" + (self._extract_plain_text_from_block(child) or '')
+                if len(content_text.strip()) >= 20:
+                    sections.append({
+                        'container_id': toggle['id'],
+                        'label': label.strip(),
+                        'content_text': content_text.strip()
+                    })
+            except Exception:
+                continue
+
+        # 2) Heading-based activities
+        activity_headings = self.find_activity_heading_blocks(page_id)
+        id_to_index = {b['id']: i for i, b in enumerate(all_blocks) if b.get('id')}
+        for heading in activity_headings:
+            try:
+                if self._is_block_in_synced_content(heading, all_blocks):
+                    continue
+                start_idx = id_to_index.get(heading['id'])
+                if start_idx is None:
+                    continue
+                start_level = self._heading_level_from_type(heading.get('type', ''))
+                label = self._extract_plain_text_from_block(heading) or 'Activity'
+                content_lines = [label]
+                # Collect following blocks until next heading of same or higher level
+                for j in range(start_idx + 1, min(len(all_blocks), start_idx + 60)):
+                    b = all_blocks[j]
+                    btype = b.get('type', '')
+                    if btype.startswith('heading_'):
+                        level = self._heading_level_from_type(btype)
+                        if level <= start_level:
+                            break
+                    # stop at child_page boundaries
+                    if btype in ['child_page', 'child_database']:
+                        break
+                    content_lines.append(self._extract_plain_text_from_block(b) or '')
+                content_text = "\n".join([ln for ln in content_lines if ln]).strip()
+                if len(content_text) >= 20:
+                    sections.append({
+                        'container_id': heading['id'],
+                        'label': label.strip(),
+                        'content_text': content_text
+                    })
+            except Exception:
+                continue
+
+        logging.info(f"🎯 Built {len(sections)} activity sections for cultural guidance")
+        return sections
+
+    def append_cultural_toggle_to_container(self, container_block_id: str, title: str, markdown_content: str, max_blocks: int = 40):
+        """Append a toggle titled `title` with parsed markdown content as children under the container block."""
+        try:
+            # Guard synced ancestry
+            if self._is_block_or_ancestor_synced_api(container_block_id):
+                logging.warning(f"🚫 PROTECTED: Skipping cultural toggle under synced content {container_block_id[:8]}...")
+                return {'success': True, 'skipped': True}
+            # Idempotency: skip if exists
+            title_prefix = title.split(':')[0].strip() if ':' in title else title
+            if self._child_toggle_exists(container_block_id, title_prefix):
+                logging.info("♻️ Cultural toggle already exists; skipping")
+                return {'success': True, 'skipped': True}
+
+            # Build structured children if possible
+            children_blocks = self.build_cultural_guidance_children(markdown_content)[:max_blocks]
+            toggle_block = self.create_toggle_block(title, children_blocks)
+            try:
+                result = self.client.blocks.children.append(container_block_id, children=[toggle_block])
+                return {'success': True, 'response': result}
+            except Exception as e:
+                # Fallback: append to parent of the container
+                logging.info(f"↩️ Falling back to append under parent of container: {e}")
+                container = self.client.blocks.retrieve(container_block_id)
+                parent = container.get('parent') or {}
+                target_id = parent.get('block_id') or parent.get('page_id')
+                if not target_id:
+                    raise
+                result = self.client.blocks.children.append(target_id, children=[toggle_block])
+                return {'success': True, 'response': result, 'fallback': True}
+        except Exception as e:
+            logging.error(f"❌ Failed to append cultural toggle: {e}")
+            return {'success': False, 'error': str(e)}
     
     def get_toggle_children(self, toggle_block_id):
         """
@@ -867,6 +1067,162 @@ class NotionWriter:
         except Exception as e:
             logging.warning(f"⚠️ Could not get toggle children: {e}")
             return []
+
+    def _child_toggle_exists(self, container_block_id: str, title_prefix: str) -> bool:
+        """Return True if a child toggle under container starts with title_prefix."""
+        try:
+            resp = self.client.blocks.children.list(container_block_id)
+            for child in resp.get('results', []):
+                if child.get('type') != 'toggle':
+                    continue
+                text = self._extract_plain_text_from_block(child) or ''
+                if text.strip().startswith(title_prefix):
+                    return True
+        except Exception as e:
+            logging.warning(f"⚠️ Could not check existing toggles: {e}")
+        return False
+
+    def _build_section_toggle(self, title: str, items: list) -> dict:
+        """Create a toggle titled `title` containing bulleted list items from `items` text list."""
+        children = []
+        for raw in items:
+            text = raw.strip()
+            if not text:
+                continue
+            # remove leading bullet markers if present
+            text = re.sub(r"^[-*•]\s+", "", text)
+            rich = self._markdown_to_rich_text(text)
+            children.append(self.create_bulleted_list_item_block(text, rich_text=rich))
+        return self.create_toggle_block(title, children)
+
+    def build_cultural_guidance_children(self, markdown_text: str) -> list:
+        """Convert cultural analysis markdown into nested toggles by sections.
+
+        Sections recognized (case-insensitive):
+        - Cultural Strengths
+        - Cultural Challenges
+        - Alternative Activities
+        - Targeted Adaptations
+
+        Falls back to flat parsing if no sections found.
+        """
+        lines = [ln.rstrip() for ln in markdown_text.split('\n')]
+        sections = {
+            'cultural strengths': [],
+            'cultural challenges': [],
+            'alternative activities': [],
+            'targeted adaptations': []
+        }
+        current_key = None
+        header_patterns = [
+            re.compile(r"^##\s*(cultural strengths)\b", re.I),
+            re.compile(r"^##\s*(cultural challenges)\b", re.I),
+            re.compile(r"^##\s*(alternative activities)\b", re.I),
+            re.compile(r"^##\s*(targeted adaptations)\b", re.I),
+            # Bold label bullet style: **Cultural Strengths:**
+            re.compile(r"^\*?\s*\*\*(cultural strengths)\*\*:?\s*$", re.I),
+            re.compile(r"^\*?\s*\*\*(cultural challenges)\*\*:?\s*$", re.I),
+            re.compile(r"^\*?\s*\*\*(alternative activities)\*\*:?\s*$", re.I),
+            re.compile(r"^\*?\s*\*\*(targeted adaptations)\*\*:?\s*$", re.I),
+        ]
+        for ln in lines:
+            stripped = ln.strip()
+            if not stripped:
+                continue
+            found_header = False
+            for pat in header_patterns:
+                m = pat.match(stripped)
+                if m:
+                    current_key = m.group(1).lower()
+                    found_header = True
+                    break
+            if found_header:
+                continue
+            # Collect bullet-like lines under current section
+            if current_key and (stripped.startswith('- ') or stripped.startswith('* ') or stripped.startswith('• ') or re.match(r'^\d+\.\s+', stripped)):
+                sections[current_key].append(stripped)
+
+        def strip_leading_bullet(s: str) -> str:
+            return re.sub(r"^(?:[-*•]\s+|\d+\.\s+)", "", s).strip()
+
+        def strip_redundant_label_for_section(section_key: str, text: str) -> str:
+            # Remove a leading label that duplicates the section, e.g., "Challenges: ..." inside Challenges
+            label = section_key.split()[-1]  # strengths/challenges/activities/adaptations
+            pattern = re.compile(rf"^\*?\*?{label}\*?\*?:\s+", re.I)
+            return pattern.sub("", text)
+
+        def is_topic_header(text: str) -> bool:
+            # A line that ends with a colon and has no other content after it (ignoring bold markers)
+            tmp = text.strip()
+            # Remove surrounding bold markers for detection
+            tmp = re.sub(r"^\*\*(.*?)\*\*$", r"\1", tmp)
+            return tmp.endswith(':') and len(tmp.rstrip(':').strip()) > 0 and not re.search(r":\s+\S+", tmp)
+
+        def clean_title(text: str) -> str:
+            # Remove trailing colon and surrounding bold markers for titles
+            t = text.strip()
+            t = re.sub(r"^\*\*(.*?)\*\*$", r"\1", t)
+            t = t.rstrip(':').strip()
+            return t
+
+        # Build toggles for sections that have content, grouping sub-topics
+        children = []
+        for key, items in sections.items():
+            if items:
+                title = key.title()
+                # Pre-clean items
+                cleaned_items = []
+                for it in items:
+                    content = strip_leading_bullet(it)
+                    content = strip_redundant_label_for_section(key, content)
+                    cleaned_items.append(content)
+                # Group into topic headers and their child bullets
+                grouped = []
+                idx = 0
+                while idx < len(cleaned_items):
+                    current = cleaned_items[idx]
+                    if is_topic_header(current):
+                        topic_title = clean_title(current)
+                        group_children = []
+                        idx += 1
+                        while idx < len(cleaned_items):
+                            nxt = cleaned_items[idx]
+                            if is_topic_header(nxt):
+                                break
+                            group_children.append(nxt)
+                            idx += 1
+                        if group_children:
+                            # Create nested toggle for this topic
+                            title_rich = self._markdown_to_rich_text(topic_title)
+                            topic_toggle = self.create_toggle_block(topic_title, [
+                                # children bulleted items
+                            ])
+                            # Replace title to rich_text
+                            topic_toggle['toggle']['rich_text'] = title_rich
+                            # Build children bullets
+                            topic_children_blocks = []
+                            for gc in group_children:
+                                rich = self._markdown_to_rich_text(gc)
+                                topic_children_blocks.append(self.create_bulleted_list_item_block(gc, rich_text=rich))
+                            topic_toggle['toggle']['children'] = topic_children_blocks
+                            grouped.append(topic_toggle)
+                        else:
+                            # No children; render as single bullet
+                            rich = self._markdown_to_rich_text(topic_title)
+                            grouped.append(self.create_bulleted_list_item_block(topic_title, rich_text=rich))
+                    else:
+                        # Simple bullet
+                        rich = self._markdown_to_rich_text(current)
+                        grouped.append(self.create_bulleted_list_item_block(current, rich_text=rich))
+                        idx += 1
+                # Wrap grouped content under a section toggle
+                section_toggle = self.create_toggle_block(title, grouped if grouped else None)
+                children.append(section_toggle)
+
+        if children:
+            return children
+        # Fallback: flat conversion
+        return self.parse_markdown_to_blocks(markdown_text)
     
     def find_activity_blocks(self, page_id):
         """
@@ -1147,8 +1503,8 @@ class NotionWriter:
                     logging.warning(f"🚫 PROTECTED: Skipping synced block {block_id[:8]}... (shared content)")
                     continue
                 
-                # Skip other problematic types
-                if block_type in ['child_page', 'child_database', 'embed', 'file', 'image', 'video']:
+                # Skip other problematic types (keep media to edit captions)
+                if block_type in ['child_page', 'child_database', 'embed']:
                     logging.info(f"⏭️ Skipping {block_type} block {block_id[:8]}...")
                     continue
                 
@@ -1157,10 +1513,11 @@ class NotionWriter:
                     logging.warning(f"🚫 PROTECTED: Skipping block {block_id[:8]}... (inside synced content)")
                     continue
                     
-                if block_type in ['paragraph', 'heading_1', 'heading_2', 'heading_3', 
-                                'bulleted_list_item', 'numbered_list_item', 'quote', 'callout', 'toggle']:
+                if block_type in ['paragraph', 'heading_1', 'heading_2', 'heading_3',
+                                  'bulleted_list_item', 'numbered_list_item', 'quote', 'callout', 'toggle', 'to_do',
+                                  'image', 'video', 'file', 'pdf', 'audio', 'bookmark']:
                     text_content = self._extract_plain_text_from_block(block)
-                    if text_content and len(text_content.strip()) > 15:  # Only meaningful content
+                    if text_content and len(text_content.strip()) > 5:
                         updatable_blocks.append(block)
             
             logging.info(f"🚫 Protected {synced_blocks_found} synced blocks from modification")
@@ -1174,7 +1531,11 @@ class NotionWriter:
             for toggle_child in toggle_children:
                 if not any(b['id'] == toggle_child['id'] for b in updatable_blocks):
                     if not self._is_block_in_synced_content(toggle_child, all_blocks):
-                        updatable_blocks.append(toggle_child)
+                        tc_type = toggle_child.get('type')
+                        if tc_type in ['paragraph', 'heading_1', 'heading_2', 'heading_3',
+                                       'bulleted_list_item', 'numbered_list_item', 'quote', 'callout', 'toggle', 'to_do',
+                                       'image', 'video', 'file', 'pdf', 'audio', 'bookmark']:
+                            updatable_blocks.append(toggle_child)
             
             logging.info(f"🤖 Starting intelligent block-by-block update on {len(updatable_blocks)} total blocks (including toggle children)")
             
@@ -1182,10 +1543,10 @@ class NotionWriter:
             skipped_updates = 0
             failed_updates = 0
             
-            # Process blocks one by one with AI
-            for i, block in enumerate(updatable_blocks[:25]):  # Limit to prevent API overuse
+            # Process blocks one by one with AI (no hard cap; gentle rate limiting)
+            for i, block in enumerate(updatable_blocks):
                 try:
-                    logging.info(f"🔄 Processing block {i+1}/{len(updatable_blocks[:25])}: {block.get('type')}")
+                    logging.info(f"🔄 Processing block {i+1}/{len(updatable_blocks)}: {block.get('type')}")
                     
                     result = self.intelligent_block_update(
                         block['id'], 
@@ -1204,17 +1565,19 @@ class NotionWriter:
                         failed_updates += 1
                         logging.warning(f"❌ Block update failed: {result.get('error', 'Unknown')}")
                         
+                    # Gentle rate limit to respect API
+                    time.sleep(0.2)
                 except Exception as e:
                     failed_updates += 1
                     logging.error(f"❌ Error processing block {i+1}: {e}")
             
             return {
-                'success': True,
-                'blocks_processed': len(updatable_blocks[:25]),
+                'success': successful_updates > 0,
+                'blocks_processed': len(updatable_blocks),
                 'successful_updates': successful_updates,
                 'skipped_updates': skipped_updates,
                 'failed_updates': failed_updates,
-                'message': f"Processed {len(updatable_blocks[:25])} blocks: {successful_updates} updated, {skipped_updates} skipped, {failed_updates} failed"
+                'message': f"Processed {len(updatable_blocks)} blocks: {successful_updates} updated, {skipped_updates} skipped, {failed_updates} failed"
             }
             
         except Exception as e:
@@ -1241,7 +1604,11 @@ class NotionWriter:
             # Get current block with full structure
             current_block = self.client.blocks.retrieve(block_id)
             block_type = current_block.get('type')
-            
+
+            # HARD GUARD: never modify synced blocks or their children
+            if block_type == 'synced_block' or self._is_block_or_ancestor_synced_api(block_id):
+                return {'success': True, 'skipped': True, 'reason': 'Synced content'}
+
             # Extract current rich text structure
             rich_text_array = self._get_rich_text_from_block(current_block, block_type)
             
@@ -1267,24 +1634,26 @@ class NotionWriter:
                 formatting_context += "\n- The original has bold text - maintain strong emphasis where appropriate"
             
             ai_prompt = f"""
-You are improving Notion content for better readability while preserving meaning and visual elements.
-
-CURRENT BLOCK:
-Type: {block_type}
-Content: {current_plain_text}
-
-FORMATTING TO PRESERVE:{formatting_context}
-
-TASK: {enhancement_prompt}
-
-IMPORTANT: 
-- Return ONLY the improved text content
-- Do NOT add formatting markers like **bold** or *italic*
-- If there's a leading emoji, START your response with that exact emoji
-- Keep the core meaning but make it clearer and more accessible
-- Maintain the same general structure and emphasis patterns
-
-IMPROVED CONTENT:"""
+ You are improving Notion content for better readability while preserving meaning and visual elements.
+ 
+ CURRENT BLOCK:
+ Type: {block_type}
+ Content: {current_plain_text}
+ 
+ FORMATTING TO PRESERVE:{formatting_context}
+ 
+ TASK: {enhancement_prompt}
+ 
+ IMPORTANT: 
+ - Return ONLY the improved text content
+ - Do NOT add formatting markers like **bold** or *italic*
+ - If there's a leading emoji, START your response with that exact emoji
+ - Keep the core meaning but make it clearer and more accessible
+ - Maintain the same general structure and emphasis patterns
+ - Do NOT change or remove hyperlinks; keep linked text intact if present
+ - Do NOT modify Bible version abbreviations in parentheses like (NIV), (YLT), (ESV), etc.
+ 
+ IMPROVED CONTENT:"""
             
             # Get AI enhancement
             try:
@@ -1316,122 +1685,115 @@ IMPROVED CONTENT:"""
         except Exception as e:
             return {'success': False, 'error': str(e)}
     
-    def _apply_intelligent_update(self, block_id, block_type, enhanced_text, original_rich_text, original_plain_text, current_block, formatting_info=None):
-        """
-        Apply the enhanced text while preserving as much structure as possible
-        """
-        try:
-            # Trim to API limits
-            if len(enhanced_text) > 1900:
-                enhanced_text = enhanced_text[:1900] + "..."
-            
-            # Create structure-aware rich text with formatting preservation
-            enhanced_rich_text = self._create_smart_rich_text_structure(
-                enhanced_text, original_rich_text, formatting_info
-            )
-            
-            # Build update payload based on block type
-            update_data = self._build_update_payload(block_type, enhanced_rich_text, current_block)
-            
-            if not update_data:
-                return False
-            
-            # Apply the update
-            self.client.blocks.update(block_id, **update_data)
-            return True
-            
-        except Exception as e:
-            logging.error(f"❌ Intelligent update failed: {e}")
-            return False
-    
-    def _create_smart_rich_text_structure(self, enhanced_text, original_rich_text, formatting_info=None):
-        """
-        Create enhanced rich text that preserves original formatting patterns, especially emojis
-        """
+    def _sanitize_markdown_inline(self, text: str, block_type: str) -> str:
+        """Remove markdown markers like **, *, __, and leading #### for headings to avoid literal markers in Notion."""
+        original = text
+        if block_type.startswith('heading_'):
+            text = re.sub(r"^\s*#{1,6}\s*", "", text)
+        # Remove bold/italic/code markers while keeping content
+        text = re.sub(r"\*\*(.*?)\*\*", r"\1", text)
+        text = re.sub(r"\*(.*?)\*", r"\1", text)
+        text = re.sub(r"__(.*?)__", r"\1", text)
+        text = re.sub(r"_(.*?)_", r"\1", text)
+        text = re.sub(r"`(.*?)`", r"\1", text)
+        if text != original:
+            logging.info("🧹 Sanitized markdown markers from AI output")
+        return text
+
+    def _collect_preserved_spans(self, original_rich_text):
+        """Collect spans with annotations and links from original rich text for reinjection."""
+        spans = []
+        for part in original_rich_text:
+            text_obj = part.get('text', {})
+            link_obj = text_obj.get('link') or {}
+            url = link_obj.get('url')
+            annotations = part.get('annotations', {}) or {}
+            color = annotations.get('color')
+            has_any = url or any(v for k, v in annotations.items() if k != 'color') or (color and color != 'default')
+            if has_any:
+                spans.append({
+                    'text': part.get('plain_text') or text_obj.get('content') or '',
+                    'url': url,
+                    'annotations': annotations
+                })
+        return [s for s in spans if s['text']]
+
+    def _apply_spans_to_text(self, text: str, spans):
+        """Build a Notion rich_text array for `text`, reapplying spans where their substrings are found."""
+        # Start with one plain run
+        runs = [{
+            'text': text,
+            'annotations': {
+                'bold': False, 'italic': False, 'strikethrough': False,
+                'underline': False, 'code': False, 'color': 'default'
+            },
+            'link': None
+        }]
+
+        def split_run(run_idx, start, end, new_ann, new_link):
+            run = runs[run_idx]
+            s = run['text']
+            before, middle, after = s[:start], s[start:end], s[end:]
+            new_runs = []
+            if before:
+                new_runs.append({**run, 'text': before})
+            if middle:
+                ann = run['annotations'].copy()
+                ann.update(new_ann or {})
+                new_runs.append({
+                    'text': middle,
+                    'annotations': ann,
+                    'link': new_link if new_link else run.get('link')
+                })
+            if after:
+                new_runs.append({**run, 'text': after})
+            runs[run_idx:run_idx+1] = new_runs
+
+        # Apply each span in order
+        for span in spans:
+            needle = (span['text'] or '').strip()
+            if not needle:
+                continue
+            # Find in the concatenated runs by scanning per run
+            remaining = needle
+            for idx in range(len(runs)):
+                r = runs[idx]
+                hay = r['text']
+                pos = hay.find(needle)
+                if pos != -1:
+                    split_run(idx, pos, pos + len(needle), span.get('annotations') or {}, span.get('url'))
+                    break
+        # Convert runs to Notion rich_text
+        rich = []
+        for r in runs:
+            text_obj = {'content': r['text']}
+            if r.get('link'):
+                text_obj['link'] = {'url': r['link']}
+            rich.append({
+                'type': 'text',
+                'text': text_obj,
+                'annotations': r['annotations']
+            })
+        return rich
+
+    def _create_smart_rich_text_structure(self, enhanced_text, original_rich_text, formatting_info=None, block_type: str = ''):
+        """Create enhanced rich text preserving original links and annotations where possible."""
         # Handle emoji preservation first
         if formatting_info and formatting_info.get('leading_emoji'):
             emoji = formatting_info['leading_emoji']
-            # Ensure enhanced text starts with the emoji
             if not enhanced_text.startswith(emoji):
-                # If AI didn't preserve emoji, add it back
                 enhanced_text = emoji + ' ' + enhanced_text.lstrip()
                 logging.info(f"🚀 Restored leading emoji: {emoji}")
-        
-        # Simple case: no original formatting
-        if len(original_rich_text) <= 1:
+
+        # Sanitize markdown markers to avoid literal markdown in Notion
+        enhanced_text = self._sanitize_markdown_inline(enhanced_text, block_type or '')
+
+        # Collect spans to preserve
+        spans = self._collect_preserved_spans(original_rich_text)
+        if not spans:
             return [{"type": "text", "text": {"content": enhanced_text}}]
-        
-        # Check for meaningful formatting in original
-        formatted_parts = [
-            rt for rt in original_rich_text 
-            if rt.get('annotations') and any(rt['annotations'].values())
-        ]
-        
-        if not formatted_parts:
-            return [{"type": "text", "text": {"content": enhanced_text}}]
-        
-        # Try to preserve formatting patterns intelligently
-        result = []
-        words = enhanced_text.split()
-        
-        if len(words) >= 3 and formatted_parts:
-            # Find the best formatting to preserve
-            primary_formatting = formatted_parts[0].get('annotations', {})
-            
-            # Apply formatting to first meaningful part (after emoji if present)
-            if formatting_info and formatting_info.get('leading_emoji'):
-                emoji = formatting_info['leading_emoji']
-                if enhanced_text.startswith(emoji):
-                    # Split emoji from rest of text
-                    rest_text = enhanced_text[len(emoji):].strip()
-                    result.append({
-                        "type": "text",
-                        "text": {"content": emoji + ' '}
-                    })
-                    
-                    if rest_text:
-                        # Apply original formatting to meaningful content
-                        if len(rest_text.split()) >= 2:
-                            first_part = ' '.join(rest_text.split()[:2])
-                            remaining = ' '.join(rest_text.split()[2:])
-                            
-                            result.append({
-                                "type": "text",
-                                "text": {"content": first_part},
-                                "annotations": primary_formatting
-                            })
-                            
-                            if remaining:
-                                result.append({
-                                    "type": "text",
-                                    "text": {"content": ' ' + remaining}
-                                })
-                        else:
-                            result.append({
-                                "type": "text",
-                                "text": {"content": rest_text}
-                            })
-                    return result
-            
-            # No emoji - apply formatting to first part
-            first_part = ' '.join(words[:2])
-            rest_text = ' '.join(words[2:])
-            
-            result.append({
-                "type": "text",
-                "text": {"content": first_part},
-                "annotations": primary_formatting
-            })
-            
-            if rest_text:
-                result.append({
-                    "type": "text",
-                    "text": {"content": " " + rest_text}
-                })
-        else:
-            result = [{"type": "text", "text": {"content": enhanced_text}}]
-        
-        return result
+
+        return self._apply_spans_to_text(enhanced_text, spans)
     
     def _build_update_payload(self, block_type, rich_text_array, current_block):
         """
@@ -1450,6 +1812,8 @@ IMPROVED CONTENT:"""
         elif block_type == 'to_do':
             checked = current_block.get('to_do', {}).get('checked', False)
             return {"to_do": {"rich_text": rich_text_array, "checked": checked}}
+        elif block_type == 'toggle':
+            return {"toggle": {"rich_text": rich_text_array}}
         elif block_type == 'callout':
             callout_props = current_block.get('callout', {})
             return {
@@ -1459,16 +1823,67 @@ IMPROVED CONTENT:"""
                     "color": callout_props.get('color', "default")
                 }
             }
+        elif block_type == 'image':
+            return {"image": {"caption": rich_text_array}}
+        elif block_type == 'video':
+            return {"video": {"caption": rich_text_array}}
+        elif block_type == 'file':
+            return {"file": {"caption": rich_text_array}}
+        elif block_type == 'pdf':
+            return {"pdf": {"caption": rich_text_array}}
+        elif block_type == 'audio':
+            return {"audio": {"caption": rich_text_array}}
+        elif block_type == 'bookmark':
+            return {"bookmark": {"caption": rich_text_array}}
         
         return None
     
     def _is_block_in_synced_content(self, block, all_blocks):
         """
-        Check if a block is inside synced content (has synced block parent)
+        Check if a block is inside synced content by walking its parents
+        using the flattened cached blocks (which include parent info).
         """
-        # This is a simplified check - in a full implementation,
-        # we'd need to traverse the block hierarchy
-        return False  # For now, rely on direct type checking
+        try:
+            if not block:
+                return False
+            parent = block.get('parent') or {}
+            if not parent:
+                return False
+            id_to_block = {b.get('id'): b for b in all_blocks if isinstance(b, dict) and b.get('id')}
+            # Climb the ancestor chain as long as parent is a block
+            while parent and parent.get('type') == 'block_id':
+                parent_id = parent.get('block_id')
+                if not parent_id:
+                    break
+                parent_block = id_to_block.get(parent_id)
+                if not parent_block:
+                    # Parent might not be in cached list; stop here
+                    break
+                if parent_block.get('type') == 'synced_block':
+                    return True
+                parent = parent_block.get('parent') or {}
+        except Exception as e:
+            logging.warning(f"⚠️ Could not determine synced ancestry from cache: {e}")
+        return False
+
+    def _is_block_or_ancestor_synced_api(self, block_id: str) -> bool:
+        """Hard guard using API: return True if this block or any ancestor is a synced_block."""
+        try:
+            block = self.client.blocks.retrieve(block_id)
+            if block.get('type') == 'synced_block':
+                return True
+            parent = block.get('parent') or {}
+            while parent and parent.get('type') == 'block_id':
+                parent_id = parent.get('block_id')
+                if not parent_id:
+                    break
+                parent_block = self.client.blocks.retrieve(parent_id)
+                if parent_block.get('type') == 'synced_block':
+                    return True
+                parent = parent_block.get('parent') or {}
+        except Exception as e:
+            logging.warning(f"⚠️ API ancestry check failed for {block_id}: {e}")
+        return False
     
     def _find_toggle_children_blocks(self, page_id):
         """
@@ -1564,3 +1979,31 @@ IMPROVED CONTENT:"""
                 })
         
         return formatting_info
+
+    def _apply_intelligent_update(self, block_id, block_type, enhanced_text, original_rich_text, original_plain_text, current_block, formatting_info=None):
+        """
+        Apply the enhanced text while preserving as much structure as possible
+        """
+        try:
+            # Trim to API limits
+            if len(enhanced_text) > 1900:
+                enhanced_text = enhanced_text[:1900] + "..."
+            
+            # Create structure-aware rich text with link/annotation preservation
+            enhanced_rich_text = self._create_smart_rich_text_structure(
+                enhanced_text, original_rich_text, formatting_info, block_type
+            )
+            
+            # Build update payload based on block type
+            update_data = self._build_update_payload(block_type, enhanced_rich_text, current_block)
+            
+            if not update_data:
+                return False
+ 
+            # Apply the update
+            self.client.blocks.update(block_id, **update_data)
+            return True
+            
+        except Exception as e:
+            logging.error(f"❌ Intelligent update failed: {e}")
+            return False
