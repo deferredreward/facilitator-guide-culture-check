@@ -1,15 +1,32 @@
 
 # Reading:
-    prompt = f"""You are an expert in making technical and educational content more accessible to non-native English speakers who have an 8th-grade education level.
+"""You are an expert in making technical and educational content more accessible to non-native English speakers who have an 8th-grade education level.
 
-Please directly edit and improve the following markdown content to make it easier to understand for someone whose English is their 2nd, 3rd, or 4th language. Edit the text in place, do not use curly brackets or any other markers for suggestions—just make the changes directly.
+CURRENT BLOCK:
+Type: {block_type}
+Content: {current_plain_text}
 
-IMPORTANT GUIDELINES:
-1. DO NOT change key terms, especially single terms on bullet point lines
-2. DO NOT change technical terms that are essential to the content
-3. DO NOT change proper nouns, names, or specific terminology
-4. Edit the main body content directly, making it more readable and accessible
-5. Focus on:
+FORMATTING TO PRESERVE:
+{detailed_formatting}
+
+CONTEXT-AWARE INSTRUCTIONS:
+{context_info}
+- Consider the pattern from recent blocks to make intelligent decisions
+- If this is a keyword/header that fits a structural pattern, be conservative  
+- If this is content within an established flow, apply full enhancement
+- For single words: check if they're labels/headers vs. content that should be enhanced
+- Standalone structural terms might be kept unchanged
+
+TASK: Make this content more accessible to non-native English speakers who have an 8th-grade education level while carefully preserving all formatting.
+
+ENHANCEMENT GUIDELINES:
+- DO NOT change key terms, especially single terms on bullet point lines
+- DO NOT change technical terms that are essential to the content
+- DO NOT change proper nouns, names, or specific terminology
+- Do not change blocks that simply give length (e.g. '60 minutes' or '45 minutes')
+- Preserve the person, i.e. if something is in 3rd person do not change it to 1st
+- Edit the main body content directly, making it more readable and accessible
+- Focus on:
    - Simplifying complex sentence structures
    - Using shorter, clearer sentences
    - Replacing difficult words with simpler alternatives
@@ -17,11 +34,85 @@ IMPORTANT GUIDELINES:
    - Making instructions more step-by-step
    - Using active voice instead of passive voice
 
-Here's the content to enhance:
+FORMATTING INSTRUCTIONS:
+- Intelligently preserve original formatting. If you change a formated word, the new term should get the formating of the original. Do not otherwise invent new formating.
+- If there's a leading emoji, START your response with that exact emoji
+- Preserve original formatting where it makes sense, apply equivalent formatting to enhanced text
 
-{content}
 
-Please return the improved content, keeping the original markdown formatting intact."""
+IMPORTANT: 
+- Return your improved text using the formatting syntax above
+- Keep the core meaning but make it clearer and more accessible  
+- Maintain the same general structure and emphasis patterns
+- CRITICAL: Do NOT change or remove any hyperlinks; keep ALL linked text exactly intact
+- Keep direct Bible quotes, usually marked by version abbreviations like (NIV), (ESV), (YLT) exactly as shown
+- If a block does not need a change return only "NO CHANGES"
+
+IMPROVED CONTENT:"""
+
+
+# Translation:
+"""You are an expert translator specializing in technical and educational content for intercultural training materials.
+
+CURRENT BLOCK:
+Type: {block_type}
+Content: {current_plain_text}
+
+FORMATTING TO PRESERVE:
+{detailed_formatting}
+
+CONTEXT-AWARE INSTRUCTIONS:
+{context_info}
+- Consider the pattern from recent blocks to make intelligent decisions
+- If this is a keyword/header that fits a structural pattern, be conservative  
+- If this is content within an established flow, apply full translation
+- For single words: check if they're labels/headers vs. translatable content
+- Short content like "Instructions" after setup content should be translated
+- Standalone structural terms might be kept unchanged
+
+TASK: Translate the following content to {target_language} while carefully preserving all formatting.
+
+CRITICAL PRESERVATION REQUIREMENTS:
+1. **ALL formatting** - Intelligently preserve bold, italic, colors, underlines, strikethrough, code formatting by finding the equivalent content in your translated text and applying the same formatting
+2. **ALL emojis** - Preserve every emoji exactly where it appears
+3. **Technical terminology** - Keep specialized terms but translate their explanations
+4. **Proper nouns** - Keep names of people, places, organizations unchanged
+5. **Biblical references** - Keep direct Bible quotes, usually marked by version abbreviations like (NIV), (ESV), (YLT) exactly as shown
+6. **Cultural activities structure** - Maintain the flow and organization of activities
+7. **Links and hyperlinks** - For any linked text, translate the sentence & link text but preserve the link functionality exactly. Add contextual words like "lihat:" (see) or "rujuk ke:" (refer to) before the linked text if needed.
+   Example: "familiar with [linked text]" becomes "akrab dengan Kualitas Terjemahan yang Baik (lihat: [linked text])"
+
+TRANSLATION GUIDELINES:
+- Maintain the same reading level and accessibility as the original
+- Preserve the tone (professional, educational, friendly)
+- If terminology doesn't exist in the target language, keep the English term and add a brief explanation
+- Maintain consistency in key term translation throughout the document
+
+FORMATTING INSTRUCTIONS:
+- Use **bold** for text that should be bold
+- Use *italic* for text that should be italic  
+- Use ***bold+italic*** for text that should be both bold AND italic
+- Use ~~strikethrough~~ for crossed-out text
+- Use `code` for code/monospace text
+- Use [color:red]text[/color] for colored text (colors: red, blue, green, yellow, orange, purple, pink, gray, brown)
+- Use [text](url) for links that you want to create
+- If there's a leading emoji, START your response with that exact emoji
+- Preserve original formatting where it makes sense, apply equivalent formatting to translated text
+
+EXAMPLES:
+- Original: Green colored "Discovery Activity" → Translated: [color:green]Aktivitas Penemuan[/color]
+- Original: Bold+italic text → Translated: ***teks penting***
+- Original: Link with formatting → Translated: **[Tautan Penting](https://example.com)**
+
+IMPORTANT: 
+- Return your translated text using the formatting syntax above
+- Keep the core meaning but translate accurately
+- Maintain the same general structure and emphasis patterns
+- CRITICAL: Do NOT change or remove any hyperlinks; keep ALL linked text functionality intact
+- Do NOT modify Bible version abbreviations in parentheses like (NIV), (YLT), (ESV), etc.
+
+TRANSLATED CONTENT:"""
+
 
 # Trainer Questions:
    prompt = f"""
@@ -70,6 +161,7 @@ TRAINING CONTENT:
 2. **Cultural‑Dimension Analysis**  
    For **each** activity, evaluate its fit in relation to the cultural dimensions below.  
    Comment on how the activity might succeed or struggle when participants lean toward different ends of any dimension.
+   Do not suggest removing religious content, we are doing Bible translation. A small section might be dedicated to how, if we happen to be working with people who are of a non-Christian faith, we might approach this task.
 
    - High‑ vs. Low‑Context Communication  
    - Directness & Face‑Saving  
@@ -101,6 +193,7 @@ TRAINING CONTENT:
 Provide a comprehensive yet practical cultural analysis that helps facilitators adapt each activity for diverse intercultural classrooms.  
 Output only your analysis in the specified markdown format – no additional commentary.
 """
+
 
 
 # Notes:

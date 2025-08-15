@@ -31,7 +31,7 @@ def get_page_id():
     parser = argparse.ArgumentParser(description='Enhance Notion page readability using AI')
     parser.add_argument('page_id', nargs='?', help='Notion page ID')
     parser.add_argument('--page', help='Notion page ID (alternative to positional argument)')
-    parser.add_argument('--ai', choices=['claude', 'anthropic', 'gemini', 'openai'], default='gemini',
+    parser.add_argument('--ai', choices=['claude', 'anthropic', 'gemini', 'openai', 'xai'], default='gemini',
                        help='AI model to use (default: gemini)')
     
     args = parser.parse_args()
@@ -156,7 +156,7 @@ def get_full_model_name(ai_choice):
     if ai_choice in ['claude', 'anthropic']:
         return os.getenv('CLAUDE_MODEL', 'claude-3-5-sonnet-20241022')
     elif ai_choice == 'openai':
-        return os.getenv('OPENAI_MODEL', 'gpt-4o')
+        return os.getenv('OPENAI_MODEL', 'gpt-5')
     else:  # gemini
         return os.getenv('GEMINI_MODEL', 'gemini-2.5-flash-preview-05-20')
 

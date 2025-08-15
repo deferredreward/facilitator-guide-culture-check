@@ -29,6 +29,8 @@ from ai_reading_enhancer import enhance_content_with_ai, get_block_level_reading
 from notion_writer import NotionWriter
 from ai_handler import AIHandler
 from file_finder import find_debug_file_by_page_id_only
+from ai_translator import NotionTranslator
+from notion_writer import load_prompt_from_file
 
 # Setup logging with file output
 def setup_dual_logging():
@@ -118,6 +120,12 @@ def extract_page_id_from_url(url_or_id):
 def log_ai_interaction(prompt, response, model_type, operation):
     """Log AI interactions separately"""
     try:
+        # Handle None values gracefully
+        prompt = prompt or ""
+        response = response or ""
+        model_type = model_type or "unknown"
+        operation = operation or "unknown"
+        
         ai_logger = logging.getLogger('ai_interactions')
         ai_logger.info(f"=== {operation.upper()} ===")
         ai_logger.info(f"Model: {model_type}")
@@ -186,16 +194,18 @@ def load_reading_prompt_from_txt(path: str = "prompts.txt") -> str:
 class NotionOrchestrator:
     """Orchestrates the complete AI enhancement workflow"""
     
-    def __init__(self, ai_model='claude', dry_run=False):
+    def __init__(self, ai_model='claude', dry_run=False, num_blocks=None):
         """
         Initialize orchestrator
         
         Args:
             ai_model (str): AI model to use ('claude', 'gemini', 'openai')
             dry_run (bool): If True, show what would be done without making changes
+            num_blocks (int): Limit number of blocks to process (for testing)
         """
         self.ai_model = ai_model
         self.dry_run = dry_run
+        self.num_blocks = num_blocks
         self.writer = NotionWriter()
         self.ai_handler = AIHandler(ai_model)
         
@@ -423,7 +433,7 @@ class NotionOrchestrator:
             enhancement_prompt = get_block_level_reading_instructions()
             
             application_result = self.writer.intelligent_block_by_block_update(
-                page_id, enhancement_prompt, self.ai_handler
+                page_id, enhancement_prompt, self.ai_handler, self.num_blocks
             )
             
             return {
@@ -442,6 +452,47 @@ class NotionOrchestrator:
             return {
                 'success': False,
                 'error': str(e)
+            }
+    
+    def _translate_content(self, page_id, target_language):
+        """Translate content using intelligent block-by-block AI translation"""
+        try:
+            if self.dry_run:
+                logging.info(f"🔍 DRY RUN: Would perform block-by-block translation to {target_language}")
+                return {
+                    'success': True,
+                    'content_generated': True,
+                    'applied': False,
+                    'blocks_updated': 0,
+                    'message': f'DRY RUN: Would translate to {target_language}'
+                }
+            
+            # For translation, we just pass the target language and let the NotionWriter handle the prompt
+            # The Translation prompt in prompts.txt has {target_language} placeholder
+            enhancement_prompt = f"translate_to_{target_language}"
+            
+            application_result = self.writer.intelligent_block_by_block_update(
+                page_id, enhancement_prompt, self.ai_handler, self.num_blocks
+            )
+            
+            return {
+                'success': application_result['success'],
+                'content_generated': True,
+                'applied': True,
+                'target_language': target_language,
+                'blocks_processed': application_result.get('blocks_processed', 0),
+                'successful_updates': application_result.get('successful_updates', 0),
+                'skipped_updates': application_result.get('skipped_updates', 0),
+                'failed_updates': application_result.get('failed_updates', 0),
+                'application_result': application_result
+            }
+            
+        except Exception as e:
+            logging.error(f"❌ Translation to {target_language} failed: {e}")
+            return {
+                'success': False,
+                'error': str(e),
+                'blocks_updated': 0
             }
     
     def _insert_trainer_questions(self, page_id, questions_content):
@@ -515,12 +566,16 @@ def main():
     """Main function to run the orchestrator"""
     parser = argparse.ArgumentParser(description='Run complete AI enhancement workflow on Notion page')
     parser.add_argument('page_id', help='Notion page ID or URL')
-    parser.add_argument('--ai', default='claude', choices=['claude', 'gemini', 'openai'],
+    parser.add_argument('--ai', default='claude', choices=['claude', 'gemini', 'openai', 'xai'],
                       help='AI model to use (default: claude)')
     parser.add_argument('--dry-run', action='store_true',
                       help='Show what would be done without making changes')
-    parser.add_argument('--only', choices=['scrape', 'questions', 'culture', 'reading'],
+    parser.add_argument('--only', choices=['scrape', 'questions', 'culture', 'reading', 'translation'],
                       help='Run only a specific step instead of the full workflow')
+    parser.add_argument('--force-refresh', action='store_true', 
+                      help='Force refresh cached data by running scrape first')
+    parser.add_argument('--target-lang', '-tl', help='Target language for translation (when using --only translation)')
+    parser.add_argument('--num-blocks', type=int, help='Limit number of blocks to process (for testing)')
     
     args = parser.parse_args()
     
@@ -530,7 +585,16 @@ def main():
     logging.info(f"🎯 Extracted Page ID: {clean_page_id}")
     
     # Initialize orchestrator
-    orchestrator = NotionOrchestrator(ai_model=args.ai, dry_run=args.dry_run)
+    orchestrator = NotionOrchestrator(ai_model=args.ai, dry_run=args.dry_run, num_blocks=args.num_blocks)
+    
+    # Handle force refresh
+    if args.force_refresh:
+        logging.info("🔄 Force refresh requested - running scrape first...")
+        scrape_result = orchestrator._scrape_page(clean_page_id)
+        if not scrape_result.get('success'):
+            logging.error("❌ Failed to refresh cached data")
+            sys.exit(1)
+        logging.info("✅ Cached data refreshed successfully")
     
     # Run single step if requested
     if args.only:
@@ -541,11 +605,16 @@ def main():
             res = orchestrator._generate_and_insert_questions(clean_page_id)
         elif step == 'culture':
             res = orchestrator._generate_and_insert_cultural_adaptations(clean_page_id)
-        else:  # reading
+        elif step == 'reading':
             res = orchestrator._enhance_readability(clean_page_id)
+        else:  # translation
+            if not args.target_lang:
+                logging.error("❌ --target-lang is required when using --only translation")
+                sys.exit(1)
+            res = orchestrator._translate_content(clean_page_id, args.target_lang)
 
         print("\n" + "="*60)
-        print(f"🎯 STEP RESULT: {step.upper()}")
+        print(f"STEP RESULT: {step.upper()}")
         print("="*60)
         status = "✅" if res.get('success') else "❌"
         print(f"Status: {status}")
@@ -554,6 +623,9 @@ def main():
         if step == 'culture':
             print(f"Adaptations added: {res.get('adaptations_added', 0)}")
         if step == 'reading':
+            print(f"Successful updates: {res.get('successful_updates', 0)}")
+        if step == 'translation':
+            print(f"Target language: {res.get('target_language', 'Unknown')}")
             print(f"Successful updates: {res.get('successful_updates', 0)}")
         sys.exit(0 if res.get('success') else 1)
 

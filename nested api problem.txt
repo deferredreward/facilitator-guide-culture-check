@@ -1,0 +1,88 @@
+● Notion API Recursion Bug - Problem Summary
+
+  Overview
+
+  We're building a script to recursively process all blocks in a Notion page for AI enhancement. The script successfully finds most blocks but consistently misses specific numbered list items, despite those blocks being accessible when fetched individually.
+
+  Technical Context
+
+  - Script: test_whole_page_json_edit.py - Recursively fetches all blocks from a Notion page
+  - Target Block: 25072d5af2de80dc8d9dde4725a7a64b (numbered_list_item containing "1-2-4-ALL")
+  - Parent Block: 25072d5af2de806a990ac23f57158d92 (paragraph containing "Instructions:")
+
+  The Problem
+
+  What Works ✅
+
+  - Individual block fetching finds the Instructions block WITH has_children: true
+  - Individual block fetching finds the 1-2-4-ALL block as a child
+  - Bulk recursion finds the Instructions block and processes it (Block 84/110)
+  - Bulk recursion finds 110 other blocks successfully
+
+  What Fails ❌
+
+  - Bulk recursion shows Instructions block with has_children: false
+  - The 1-2-4-ALL child block is never found during recursion
+  - No children are fetched for the Instructions block
+
+  Evidence
+
+  Individual Fetch (Works)
+
+  {
+    "id": "25072d5a-f2de-806a-990a-c23f57158d92",
+    "has_children": true,  // ← TRUE when fetched individually
+    "type": "paragraph",
+    "paragraph": { "rich_text": [{"text": {"content": "Instructions:"}}] }
+  }
+
+  Children Fetch (Works)
+
+  {
+    "children": [
+      {
+        "id": "25072d5a-f2de-80dc-8d9d-de4725a7a64b",
+        "type": "numbered_list_item",
+        "numbered_list_item": {
+          "rich_text": [{"text": {"content": "Use 1-2-4-ALL to allow..."}}]
+        }
+      }
+    ]
+  }
+
+  Bulk Recursion Debug Output (Fails)
+
+  - paragraph 25072d5a (has_children: False)  // ← FALSE in bulk fetch
+
+  Processing Output (Missing Child)
+
+  Block 84/110
+  Processing paragraph block 25072d5a...
+    Text: Instructions:
+    [DRY-DRY RUN] Would send to AI for enhancement
+  No Block 85 with 1-2-4-ALL content
+
+  Root Cause Analysis
+
+  Notion API Inconsistency: The same block returns different has_children values depending on fetch method:
+  - Individual fetch (blocks.retrieve()): has_children: true
+  - Bulk children listing (blocks.children.list()): has_children: false
+
+  This causes our recursion to skip getting children for blocks that actually have them.
+
+  Attempted Solutions
+
+  1. Enhanced Error Handling: Added try/catch and detailed logging - no errors found
+  2. Debug Logging: Confirmed the Instructions block is found but shows has_children: false
+  3. Secondary Check: Added logic to force-check certain block types for children regardless of has_children flag
+
+  Current Status
+
+  The API inconsistency has been identified and a targeted fix implemented, but needs testing to confirm it resolves the missing child blocks issue.
+
+  Questions for Opus
+
+  1. Is this a known Notion API inconsistency pattern?
+  2. What's the most robust way to handle blocks that show has_children: false but actually have children?
+  3. Should we implement a blanket secondary check for all paragraph/heading blocks, or be more selective?
+  4. Are there other Notion API quirks that could cause similar recursive traversal issues?
