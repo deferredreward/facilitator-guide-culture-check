@@ -146,7 +146,7 @@ def get_full_model_name(ai_choice):
     if ai_choice in ['claude', 'anthropic']:
         return os.getenv('CLAUDE_MODEL', 'claude-3-5-sonnet-20241022')
     elif ai_choice == 'openai':
-        return os.getenv('OPENAI_MODEL', 'gpt-4o')
+        return os.getenv('OPENAI_MODEL', 'gpt-5')
     else:  # gemini
         return os.getenv('GEMINI_MODEL', 'gemini-2.5-flash-preview-05-20')
 

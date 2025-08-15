@@ -2,6 +2,10 @@
 saved_pages/
 userinput.py
 .cursorrules
+saved_pages/
+saved_blocks/
+scraped_pages/
+test_results/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -197,3 +201,9 @@ cython_debug/
 #  refer to https://docs.cursor.com/context/ignore-files
 .cursorignore
 .cursorindexingignore
+
+# YoYo AI version control directory
+.yoyo/
+
+# VSCode settings
+.vscode/

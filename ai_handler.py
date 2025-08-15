@@ -24,9 +24,12 @@ class AIHandler:
         Initialize AI handler
         
         Args:
-            model_type (str): 'claude', 'anthropic', 'gemini', or 'openai' (default: gemini)
+            model_type (str): Provider name ('claude', 'anthropic', 'gemini', 'openai') 
+                             or specific model name (auto-detects provider)
         """
-        self.model_type = model_type.lower()
+        # Auto-detect provider from model name if it's a specific model
+        detected_provider = self._detect_provider_from_model(model_type)
+        self.model_type = detected_provider.lower()
         self.claude_client = None
         self.gemini_model = None
         self.openai_client = None
@@ -34,10 +37,35 @@ class AIHandler:
         # Initialize the selected model
         if self.model_type in ['claude', 'anthropic']:
             self._init_claude()
-        elif self.model_type == 'openai':
+        elif self.model_type in ['openai', 'xai']:
             self._init_openai()
         else:
             self._init_gemini()
+    
+    def _detect_provider_from_model(self, model_input):
+        """
+        Detect AI provider from model name
+        
+        Args:
+            model_input (str): Model name or provider name
+            
+        Returns:
+            str: Provider name ('claude', 'openai', 'gemini', or original input)
+        """
+        model_lower = model_input.lower()
+        
+        # Current model naming patterns as of 2025
+        if 'gpt' in model_lower:
+            return 'openai'
+        elif 'claude' in model_lower:
+            return 'claude'
+        elif 'gemini' in model_lower:
+            return 'gemini'
+        elif 'grok' in model_lower or 'xai' in model_lower:
+            return 'xai'  # xAI uses OpenAI-compatible API
+        
+        # Default to original input if no match (assume it's a provider name)
+        return model_input
     
     def _init_claude(self):
         """Initialize Claude client"""
@@ -70,18 +98,37 @@ class AIHandler:
             raise
     
     def _init_openai(self):
-        """Initialize OpenAI client"""
-        api_key = os.getenv('OPENAI_API_KEY')
-        if not api_key:
-            raise ValueError("OPENAI_API_KEY not found in environment variables")
-        
-        try:
-            self.openai_client = openai.OpenAI(api_key=api_key)
-            logging.info("✅ OpenAI client initialized successfully")
-        except Exception as e:
-            logging.error(f"❌ Failed to initialize OpenAI client: {e}")
-            logging.error("💡 Check your OPENAI_API_KEY and try updating the openai library: pip install --upgrade openai")
-            raise
+        """Initialize OpenAI or xAI client"""
+        if self.model_type == 'xai':
+            # xAI (Grok) setup
+            api_key = os.getenv('XAI_API_KEY')
+            if not api_key:
+                raise ValueError("XAI_API_KEY not found in environment variables")
+            
+            try:
+                # xAI uses OpenAI-compatible API but different endpoint
+                self.openai_client = openai.OpenAI(
+                    api_key=api_key,
+                    base_url="https://api.x.ai/v1"
+                )
+                logging.info("✅ xAI (Grok) client initialized successfully")
+            except Exception as e:
+                logging.error(f"❌ Failed to initialize xAI client: {e}")
+                logging.error("💡 Check your XAI_API_KEY and ensure xAI API access")
+                raise
+        else:
+            # Standard OpenAI setup
+            api_key = os.getenv('OPENAI_API_KEY')
+            if not api_key:
+                raise ValueError("OPENAI_API_KEY not found in environment variables")
+            
+            try:
+                self.openai_client = openai.OpenAI(api_key=api_key)
+                logging.info("✅ OpenAI client initialized successfully")
+            except Exception as e:
+                logging.error(f"❌ Failed to initialize OpenAI client: {e}")
+                logging.error("💡 Check your OPENAI_API_KEY and try updating the openai library: pip install --upgrade openai")
+                raise
     
     def _init_gemini(self):
         """Initialize Gemini model"""
@@ -114,7 +161,7 @@ class AIHandler:
         try:
             if self.model_type in ['claude', 'anthropic']:
                 return self._get_claude_response(prompt, max_tokens, temperature)
-            elif self.model_type == 'openai':
+            elif self.model_type in ['openai', 'xai']:
                 return self._get_openai_response(prompt, max_tokens, temperature)
             else:
                 return self._get_gemini_response(prompt, temperature)
@@ -149,25 +196,49 @@ class AIHandler:
             raise
     
     def _get_openai_response(self, prompt, max_tokens, temperature):
-        """Get response from OpenAI"""
-        model = os.getenv('OPENAI_MODEL', 'gpt-4o')
+        """Get response from OpenAI or xAI"""
+        if self.model_type == 'xai':
+            model = os.getenv('XAI_MODEL', 'grok-beta')
+            provider_name = "xAI (Grok)"
+        else:
+            model = os.getenv('OPENAI_MODEL', 'gpt-5')
+            provider_name = "OpenAI"
         
-        logging.info(f"🤖 Sending content to OpenAI ({model})...")
+        logging.info(f"🤖 Sending content to {provider_name} ({model})...")
         
         try:
-            response = self.openai_client.chat.completions.create(
-                model=model,
-                max_tokens=max_tokens,
-                temperature=temperature,
-                messages=[
+            # Build request parameters
+            completion_params = {
+                "model": model,
+                "messages": [
                     {
                         "role": "user",
                         "content": prompt
                     }
                 ]
-            )
+            }
             
-            logging.info("✅ Received response from OpenAI")
+            # Model-specific parameter handling
+            if model.startswith('gpt-5'):
+                # GPT-5 only supports default temperature (1.0) and uses max_completion_tokens
+                completion_params["max_completion_tokens"] = max_tokens
+                # Don't set temperature for GPT-5 models - they only support default
+            elif model.startswith('o1'):
+                # o1 models also use max_completion_tokens and have temperature restrictions
+                completion_params["max_completion_tokens"] = max_tokens
+                completion_params["temperature"] = 1.0  # o1 models may have different restrictions
+            elif model.startswith('grok'):
+                # Grok models use standard OpenAI parameters
+                completion_params["temperature"] = temperature
+                completion_params["max_tokens"] = max_tokens
+            else:
+                # Standard OpenAI models use standard parameters
+                completion_params["temperature"] = temperature
+                completion_params["max_tokens"] = max_tokens
+            
+            response = self.openai_client.chat.completions.create(**completion_params)
+            
+            logging.info(f"✅ Received response from {provider_name}")
             return response.choices[0].message.content
         except Exception as e:
             logging.error(f"❌ Error with OpenAI API call: {e}")
@@ -189,12 +260,20 @@ class AIHandler:
 
 def create_ai_handler(model_type='gemini'):
     """
-    Factory function to create an AI handler
+    Factory function to create an AI handler with smart model detection
     
     Args:
-        model_type (str): 'claude', 'anthropic', 'gemini', or 'openai'
+        model_type (str): Provider name ('claude', 'anthropic', 'gemini', 'openai') 
+                         or specific model name (auto-detects provider)
         
     Returns:
         AIHandler: Configured AI handler instance
+        
+    Examples:
+        create_ai_handler('openai')           # Uses provider
+        create_ai_handler('gpt-5-mini')       # Auto-detects OpenAI
+        create_ai_handler('claude-3-5-sonnet') # Auto-detects Claude
+        create_ai_handler('gemini-2.5-flash') # Auto-detects Gemini
+        create_ai_handler('grok-2')           # Auto-detects OpenAI (xAI compatible)
     """
     return AIHandler(model_type) 

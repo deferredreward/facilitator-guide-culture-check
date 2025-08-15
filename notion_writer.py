@@ -19,6 +19,33 @@ import time
 # Load environment variables
 load_dotenv()
 
+def load_prompt_from_file(prompt_name):
+    """Load a specific prompt from prompts.txt file"""
+    try:
+        prompts_file = Path(__file__).parent / 'prompts.txt'
+        if not prompts_file.exists():
+            logging.warning("⚠️ prompts.txt file not found")
+            return None
+            
+        with open(prompts_file, 'r', encoding='utf-8') as f:
+            content = f.read()
+            
+        # Find the prompt section (handle optional colon)
+        pattern = rf'# {re.escape(prompt_name)}:?\s*\n"""(.*?)"""'
+        match = re.search(pattern, content, re.DOTALL)
+        
+        if match:
+            prompt_text = match.group(1).strip()
+            logging.info(f"✅ Loaded prompt: {prompt_name}")
+            return prompt_text
+        else:
+            logging.warning(f"⚠️ Prompt '{prompt_name}' not found in prompts.txt")
+            return None
+            
+    except Exception as e:
+        logging.error(f"❌ Error loading prompt '{prompt_name}': {e}")
+        return None
+
 class NotionWriter:
     """Handler for writing back to Notion pages"""
     
@@ -451,20 +478,28 @@ class NotionWriter:
             logging.error(f"❌ Error updating block {block_id}: {e}")
             raise
     
-    def _get_all_blocks_recursively(self, block_id):
+    def _get_all_blocks_recursively(self, block_id, limit=None):
         """
         Recursively get all blocks including nested children (fallback for when cached data isn't available)
         
         Args:
             block_id (str): The block ID to start from
+            limit (int): Optional limit on total blocks to fetch
             
         Returns:
             list: List of all blocks
         """
-        logging.warning("⚠️ Using API calls to get blocks - this is slower than using cached data")
+        if limit:
+            logging.warning(f"⚠️ Using limited API calls to get {limit} blocks - much faster!")
+        else:
+            logging.warning("⚠️ Using API calls to get blocks - this is slower than using cached data")
         all_blocks = []
         
         def get_blocks(b_id):
+            # Early termination if we've hit the limit
+            if limit and len(all_blocks) >= limit:
+                return
+                
             try:
                 blocks_response = self.client.blocks.children.list(b_id)
                 for block in blocks_response['results']:
@@ -1466,7 +1501,80 @@ class NotionWriter:
                 'blocks_updated': 0
             }
     
-    def intelligent_block_by_block_update(self, page_id, enhancement_prompt, ai_handler):
+    def _get_blocks_efficiently(self, page_id, block_limit=None):
+        """
+        Get blocks efficiently - use cached if available, otherwise fetch only what we need
+        
+        Args:
+            page_id (str): Notion page ID
+            block_limit (int): Optional limit on number of blocks needed
+            
+        Returns:
+            list: List of blocks
+        """
+        # Try cached data first
+        all_blocks = self._load_cached_blocks(page_id)
+        
+        if all_blocks is not None:
+            logging.info("🗂️ Using cached block data (much faster!)")
+            return all_blocks
+            
+        # No cached data - need to fetch from API
+        if block_limit and block_limit <= 20:
+            # For small requests, fetch only top-level blocks + limited children
+            logging.info(f"📡 Fetching limited blocks from API (limit: {block_limit})")
+            return self._get_limited_blocks(page_id, block_limit)
+        else:
+            # For large requests or no limit, fall back to full recursive fetch
+            logging.info("📡 No cached data available, falling back to full API fetch...")
+            return self._get_all_blocks_recursively(page_id)
+    
+    def _get_limited_blocks(self, page_id, limit):
+        """
+        Fetch a limited number of blocks without full recursive scan
+        
+        Args:
+            page_id (str): Notion page ID  
+            limit (int): Maximum number of blocks to fetch
+            
+        Returns:
+            list: Limited list of blocks
+        """
+        try:
+            # Get top-level blocks with pagination
+            blocks = []
+            start_cursor = None
+            
+            while len(blocks) < limit:
+                response = self.client.blocks.children.list(
+                    block_id=page_id,
+                    start_cursor=start_cursor,
+                    page_size=min(limit - len(blocks), 100)  # Don't fetch more than needed
+                )
+                
+                for block in response.get('results', []):
+                    blocks.append(block)
+                    if len(blocks) >= limit:
+                        break
+                
+                # Check if there are more pages
+                if not response.get('has_more', False):
+                    break
+                    
+                start_cursor = response.get('next_cursor')
+                
+                if len(blocks) >= limit:
+                    break
+            
+            logging.info(f"📡 Fetched {len(blocks)} blocks from API (limited fetch)")
+            return blocks
+            
+        except Exception as e:
+            logging.error(f"❌ Error fetching limited blocks: {e}")
+            return []
+
+
+    def intelligent_block_by_block_update(self, page_id, enhancement_prompt, ai_handler, block_limit=None):
         """
         Update blocks one by one using AI for each block intelligently
         
@@ -1474,18 +1582,19 @@ class NotionWriter:
             page_id (str): Notion page ID
             enhancement_prompt (str): What enhancement to apply
             ai_handler: AI handler for real-time assistance
+            block_limit (int): Optional limit on number of blocks to process
             
         Returns:
             dict: Results of intelligent updates
         """
         try:
-            # Get all blocks, skipping synced blocks
-            all_blocks = self._load_cached_blocks(page_id)
+            # Get blocks efficiently based on our needs
+            all_blocks = self._get_blocks_efficiently(page_id, block_limit)
             
             if not all_blocks:
                 return {
                     'success': False,
-                    'message': 'No cached blocks found',
+                    'message': 'No blocks found',
                     'blocks_updated': 0
                 }
             
@@ -1519,23 +1628,33 @@ class NotionWriter:
                     text_content = self._extract_plain_text_from_block(block)
                     if text_content and len(text_content.strip()) > 5:
                         updatable_blocks.append(block)
+                        # Apply block limit during initial filtering (synced blocks don't count)
+                        if block_limit and block_limit > 0 and len(updatable_blocks) >= block_limit:
+                            logging.info(f"🔢 Block limit reached: {block_limit} processable blocks found")
+                            break
             
             logging.info(f"🚫 Protected {synced_blocks_found} synced blocks from modification")
             logging.info(f"📝 Found {len(updatable_blocks)} updatable blocks (excluding protected content)")
             
-            # Also find and process toggle children
-            toggle_children = self._find_toggle_children_blocks(page_id)
-            logging.info(f"🔄 Found {len(toggle_children)} additional blocks inside toggles")
-            
-            # Add toggle children to updatable blocks (if not already included)
-            for toggle_child in toggle_children:
-                if not any(b['id'] == toggle_child['id'] for b in updatable_blocks):
-                    if not self._is_block_in_synced_content(toggle_child, all_blocks):
-                        tc_type = toggle_child.get('type')
-                        if tc_type in ['paragraph', 'heading_1', 'heading_2', 'heading_3',
-                                       'bulleted_list_item', 'numbered_list_item', 'quote', 'callout', 'toggle', 'to_do',
-                                       'image', 'video', 'file', 'pdf', 'audio', 'bookmark']:
-                            updatable_blocks.append(toggle_child)
+            # Also find and process toggle children (if we haven't reached the limit)
+            if not block_limit or len(updatable_blocks) < block_limit:
+                toggle_children = self._find_toggle_children_blocks(page_id)
+                logging.info(f"🔄 Found {len(toggle_children)} additional blocks inside toggles")
+                
+                # Add toggle children to updatable blocks (if not already included)
+                for toggle_child in toggle_children:
+                    # Check if we've reached the block limit
+                    if block_limit and block_limit > 0 and len(updatable_blocks) >= block_limit:
+                        logging.info(f"🔢 Block limit reached during toggle processing: {block_limit} blocks")
+                        break
+                        
+                    if not any(b['id'] == toggle_child['id'] for b in updatable_blocks):
+                        if not self._is_block_in_synced_content(toggle_child, all_blocks):
+                            tc_type = toggle_child.get('type')
+                            if tc_type in ['paragraph', 'heading_1', 'heading_2', 'heading_3',
+                                           'bulleted_list_item', 'numbered_list_item', 'quote', 'callout', 'toggle', 'to_do',
+                                           'image', 'video', 'file', 'pdf', 'audio', 'bookmark']:
+                                updatable_blocks.append(toggle_child)
             
             logging.info(f"🤖 Starting intelligent block-by-block update on {len(updatable_blocks)} total blocks (including toggle children)")
             
@@ -1543,15 +1662,22 @@ class NotionWriter:
             skipped_updates = 0
             failed_updates = 0
             
+            if block_limit and block_limit > 0:
+                logging.info(f"🔢 Block limit applied: processing {len(updatable_blocks)} blocks (limit: {block_limit}, {synced_blocks_found} synced blocks skipped)")
+            
             # Process blocks one by one with AI (no hard cap; gentle rate limiting)
+            # Track context from previous blocks
+            block_context = []
+            
             for i, block in enumerate(updatable_blocks):
                 try:
                     logging.info(f"🔄 Processing block {i+1}/{len(updatable_blocks)}: {block.get('type')}")
                     
-                    result = self.intelligent_block_update(
+                    result = self.intelligent_block_update_with_context(
                         block['id'], 
                         enhancement_prompt, 
-                        ai_handler
+                        ai_handler,
+                        block_context
                     )
                     
                     if result['success']:
@@ -1561,6 +1687,20 @@ class NotionWriter:
                         else:
                             successful_updates += 1
                             logging.info(f"✅ Enhanced block successfully")
+                            
+                            # Add to context if successfully processed
+                            original_text = self._extract_plain_text_from_block(block)
+                            enhanced_text = result.get('enhanced_text', '')
+                            if original_text and enhanced_text:
+                                block_context.append({
+                                    'original': original_text,
+                                    'enhanced': enhanced_text,
+                                    'type': block.get('type')
+                                })
+                                
+                                # Keep only last 3-5 blocks for context (avoid token bloat)
+                                if len(block_context) > 5:
+                                    block_context = block_context[-5:]
                     else:
                         failed_updates += 1
                         logging.warning(f"❌ Block update failed: {result.get('error', 'Unknown')}")
@@ -1588,17 +1728,18 @@ class NotionWriter:
                 'blocks_updated': 0
             }
     
-    def intelligent_block_update(self, block_id, enhancement_prompt, ai_handler):
+    def intelligent_block_update_with_context(self, block_id, enhancement_prompt, ai_handler, block_context=None):
         """
-        Use AI to intelligently update a single block without destroying formatting
+        Use AI to intelligently update a single block with context from previous blocks
         
         Args:
             block_id (str): Block ID to update
             enhancement_prompt (str): What kind of enhancement to apply
             ai_handler: AI handler for real-time assistance
+            block_context (list): Previous blocks context for smarter decisions
             
         Returns:
-            dict: Update results
+            dict: Update results including enhanced_text for context tracking
         """
         try:
             # Get current block with full structure
@@ -1621,28 +1762,73 @@ class NotionWriter:
             # Convert rich text to plain text for AI
             current_plain_text = ''.join([rt.get('text', {}).get('content', '') for rt in rich_text_array])
             
-            if len(current_plain_text.strip()) < 15:
-                return {'success': True, 'skipped': True, 'reason': 'Too short'}
+            # For context-aware processing, consider even very short text
+            if len(current_plain_text.strip()) < 2:
+                return {'success': True, 'skipped': True, 'reason': 'Empty content'}
             
-            # Create enhanced AI prompt with formatting context
+            # Build context-aware AI prompt using unified prompt system
+            context_info = ""
+            if block_context:
+                context_info = "\n\nRECENT BLOCKS CONTEXT (for understanding pattern and making intelligent decisions):\n"
+                for i, ctx in enumerate(block_context[-3:]):  # Last 3 blocks
+                    context_info += f"{i+1}. [{ctx['type']}] '{ctx['original']}' → '{ctx['enhanced']}'\n"
+                context_info += "\nNow process this block considering the above context:\n"
+            
+            # Create basic formatting context (backwards compatibility)
             formatting_context = ""
-            if formatting_info['leading_emoji']:
+            if formatting_info.get('leading_emoji'):
                 formatting_context += f"\n- PRESERVE EMOJI: Start with '{formatting_info['leading_emoji']}' "
-            if formatting_info['has_italic']:
+            if formatting_info.get('has_italic'):
                 formatting_context += "\n- The original has italic text - maintain emphasis where appropriate"
-            if formatting_info['has_bold']:
+            if formatting_info.get('has_bold'):
                 formatting_context += "\n- The original has bold text - maintain strong emphasis where appropriate"
             
-            ai_prompt = f"""
- You are improving Notion content for better readability while preserving meaning and visual elements.
+            # Generate detailed formatting description
+            detailed_formatting = self._build_detailed_formatting_description(formatting_info)
+            
+            # Detect if this is a translation task
+            is_translation = enhancement_prompt.startswith("translate_to_")
+            target_language = enhancement_prompt.replace("translate_to_", "") if is_translation else None
+            
+            # Load appropriate prompt from prompts.txt
+            prompt_name = "Translation" if is_translation else "Reading"
+            prompt_template = load_prompt_from_file(prompt_name)
+            
+            if prompt_template:
+                # Use unified prompt system with comprehensive formatting details
+                format_params = {
+                    'context_info': context_info,
+                    'block_type': block_type,
+                    'current_plain_text': current_plain_text,
+                    'detailed_formatting': detailed_formatting
+                }
+                
+                # Add target_language for translation prompts
+                if is_translation and target_language:
+                    format_params['target_language'] = target_language
+                
+                ai_prompt = prompt_template.format(**format_params)
+            else:
+                # Fallback to basic prompt if file loading fails
+                ai_prompt = f"""
+ You are improving Notion content while preserving meaning and visual elements.{context_info}
  
  CURRENT BLOCK:
  Type: {block_type}
  Content: {current_plain_text}
  
  FORMATTING TO PRESERVE:{formatting_context}
+ DETAILED FORMATTING:{detailed_formatting}
  
  TASK: {enhancement_prompt}
+ 
+ CONTEXT-AWARE INSTRUCTIONS:
+ - Consider the pattern from recent blocks to make intelligent decisions
+ - If this is a keyword/header that fits a structural pattern, be conservative  
+ - If this is content within an established flow, apply full enhancement/translation
+ - For single words: check if they're labels/headers vs. translatable content
+ - Short content like "Instructions" after setup content should be processed
+ - Standalone structural terms might be kept unchanged
  
  IMPORTANT: 
  - Return ONLY the improved text content
@@ -1650,7 +1836,7 @@ class NotionWriter:
  - If there's a leading emoji, START your response with that exact emoji
  - Keep the core meaning but make it clearer and more accessible
  - Maintain the same general structure and emphasis patterns
- - Do NOT change or remove hyperlinks; keep linked text intact if present
+ - CRITICAL: Do NOT change or remove any hyperlinks; keep ALL linked text exactly intact
  - Do NOT modify Bible version abbreviations in parentheses like (NIV), (YLT), (ESV), etc.
  
  IMPROVED CONTENT:"""
@@ -1663,8 +1849,13 @@ class NotionWriter:
                 from orchestrator import log_ai_interaction
                 log_ai_interaction(ai_prompt, enhanced_content, ai_handler.model_type, f"BLOCK_UPDATE_{block_type}")
                 
-                if not enhanced_content or len(enhanced_content.strip()) < 5:
+                if not enhanced_content or len(enhanced_content.strip()) < 1:
                     return {'success': False, 'error': 'Invalid AI response'}
+                
+                # Check if AI says no changes needed
+                if enhanced_content.strip().upper() in ['NO CHANGES', 'NO CHANGE', 'NOCHANGES']:
+                    logging.info(f"✅ AI determined no changes needed for {block_type} block")
+                    return {'success': True, 'skipped': True, 'reason': 'AI determined no changes needed'}
                 
                 # Apply intelligent update with formatting info
                 result = self._apply_intelligent_update(
@@ -1676,6 +1867,7 @@ class NotionWriter:
                     'success': result,
                     'original_length': len(current_plain_text),
                     'enhanced_length': len(enhanced_content),
+                    'enhanced_text': enhanced_content.strip(),  # For context tracking
                     'block_type': block_type
                 }
                 
@@ -1684,6 +1876,20 @@ class NotionWriter:
                 
         except Exception as e:
             return {'success': False, 'error': str(e)}
+
+    def intelligent_block_update(self, block_id, enhancement_prompt, ai_handler):
+        """
+        Legacy method - delegates to context-aware version
+        
+        Args:
+            block_id (str): Block ID to update
+            enhancement_prompt (str): What kind of enhancement to apply
+            ai_handler: AI handler for real-time assistance
+            
+        Returns:
+            dict: Update results
+        """
+        return self.intelligent_block_update_with_context(block_id, enhancement_prompt, ai_handler, [])
     
     def _sanitize_markdown_inline(self, text: str, block_type: str) -> str:
         """Remove markdown markers like **, *, __, and leading #### for headings to avoid literal markers in Notion."""
@@ -1739,7 +1945,13 @@ class NotionWriter:
                 new_runs.append({**run, 'text': before})
             if middle:
                 ann = run['annotations'].copy()
-                ann.update(new_ann or {})
+                # Merge annotations (preserve existing + add new)
+                if new_ann:
+                    for key, value in new_ann.items():
+                        if key == 'color' and value != 'default':
+                            ann[key] = value  # Override color
+                        elif isinstance(value, bool) and value:
+                            ann[key] = True   # Enable boolean annotations
                 new_runs.append({
                     'text': middle,
                     'annotations': ann,
@@ -1749,35 +1961,63 @@ class NotionWriter:
                 new_runs.append({**run, 'text': after})
             runs[run_idx:run_idx+1] = new_runs
 
+        # Sort spans by text length (longest first) for better matching
+        sorted_spans = sorted(spans, key=lambda s: len(s.get('text', '')), reverse=True)
+        
         # Apply each span in order
-        for span in spans:
-            needle = (span['text'] or '').strip()
-            if not needle:
+        for span in sorted_spans:
+            needle = (span.get('text', '') or '').strip()
+            if not needle or len(needle) < 2:  # Skip very short spans
                 continue
-            # Find in the concatenated runs by scanning per run
-            remaining = needle
-            for idx in range(len(runs)):
-                r = runs[idx]
-                hay = r['text']
-                pos = hay.find(needle)
-                if pos != -1:
-                    split_run(idx, pos, pos + len(needle), span.get('annotations') or {}, span.get('url'))
+                
+            # Enhanced fuzzy matching - try exact match first, then partial
+            matched = False
+            for search_text in [needle, needle.lower(), needle.replace(' ', '')]:
+                if matched:
                     break
+                    
+                for idx in range(len(runs)):
+                    if matched:
+                        break
+                    r = runs[idx]
+                    hay = r['text']
+                    
+                    # Try different matching strategies
+                    positions = []
+                    
+                    # Exact match
+                    pos = hay.find(search_text)
+                    if pos != -1:
+                        positions.append((pos, pos + len(search_text), len(search_text)))
+                    
+                    # Case-insensitive match
+                    pos = hay.lower().find(search_text.lower())
+                    if pos != -1 and pos not in [p[0] for p in positions]:
+                        positions.append((pos, pos + len(search_text), len(search_text)))
+                    
+                    # Use the best match (prefer exact, then case-insensitive)
+                    if positions:
+                        start_pos, end_pos, match_len = positions[0]
+                        split_run(idx, start_pos, end_pos, span.get('annotations') or {}, span.get('url'))
+                        matched = True
+                        break
+                        
         # Convert runs to Notion rich_text
         rich = []
         for r in runs:
-            text_obj = {'content': r['text']}
-            if r.get('link'):
-                text_obj['link'] = {'url': r['link']}
-            rich.append({
-                'type': 'text',
-                'text': text_obj,
-                'annotations': r['annotations']
-            })
-        return rich
+            if r['text']:  # Only include non-empty text
+                text_obj = {'content': r['text']}
+                if r.get('link'):
+                    text_obj['link'] = {'url': r['link']}
+                rich.append({
+                    'type': 'text',
+                    'text': text_obj,
+                    'annotations': r['annotations']
+                })
+        return rich if rich else [{"type": "text", "text": {"content": text}}]
 
     def _create_smart_rich_text_structure(self, enhanced_text, original_rich_text, formatting_info=None, block_type: str = ''):
-        """Create enhanced rich text preserving original links and annotations where possible."""
+        """Create enhanced rich text using hybrid markdown + color tag parsing."""
         # Handle emoji preservation first
         if formatting_info and formatting_info.get('leading_emoji'):
             emoji = formatting_info['leading_emoji']
@@ -1785,15 +2025,40 @@ class NotionWriter:
                 enhanced_text = emoji + ' ' + enhanced_text.lstrip()
                 logging.info(f"🚀 Restored leading emoji: {emoji}")
 
-        # Sanitize markdown markers to avoid literal markdown in Notion
-        enhanced_text = self._sanitize_markdown_inline(enhanced_text, block_type or '')
-
-        # Collect spans to preserve
-        spans = self._collect_preserved_spans(original_rich_text)
-        if not spans:
-            return [{"type": "text", "text": {"content": enhanced_text}}]
-
-        return self._apply_spans_to_text(enhanced_text, spans)
+        # Use hybrid markdown + color tag parser
+        rich_text_array = self._parse_hybrid_markdown_to_rich_text(enhanced_text)
+        
+        # Preserve any links from original that weren't captured by the AI
+        original_links = []
+        for rt in original_rich_text:
+            link_info = rt.get('text', {}).get('link')
+            if link_info and link_info.get('url'):
+                original_links.append({
+                    'text': rt.get('text', {}).get('content', ''),
+                    'url': link_info['url']
+                })
+        
+        # If we have important links that weren't preserved, try to re-inject them
+        if original_links:
+            # Simple approach: if the link text still exists somewhere in the enhanced text,
+            # find it and convert it to a link in the rich text array
+            for link in original_links:
+                link_text = link['text'].strip()
+                if link_text and len(link_text) > 3:  # Only try to preserve substantial link text
+                    # Validate URL first
+                    valid_url = self._validate_and_convert_url(link['url'])
+                    if valid_url:
+                        for rt_item in rich_text_array:
+                            content = rt_item.get('text', {}).get('content', '')
+                            if link_text in content:
+                                # Found the link text, convert it to a link
+                                rt_item['text']['link'] = {'url': valid_url}
+                                logging.info(f"🔗 Preserved link: {link_text} -> {valid_url[:50]}...")
+                                break
+                    else:
+                        logging.warning(f"⚠️ Skipped preserving invalid link: {link_text} -> {link['url']}")
+        
+        return rich_text_array
     
     def _build_update_payload(self, block_type, rich_text_array, current_block):
         """
@@ -1926,20 +2191,27 @@ class NotionWriter:
     
     def _extract_emoji_and_formatting_info(self, rich_text_array):
         """
-        Extract emoji, formatting patterns from original rich text
+        Extract comprehensive formatting information from original rich text
         
         Args:
             rich_text_array (list): Original rich text structure
             
         Returns:
-            dict: Formatting information to preserve
+            dict: Comprehensive formatting information to preserve
         """
         formatting_info = {
             'leading_emoji': '',
             'has_bold': False,
             'has_italic': False,
+            'has_strikethrough': False,
+            'has_underline': False,
+            'has_code': False,
             'has_colors': False,
-            'formatting_patterns': []
+            'color_info': {},
+            'has_links': False,
+            'link_info': [],
+            'formatting_patterns': [],
+            'rich_spans': []
         }
         
         if not rich_text_array:
@@ -1949,36 +2221,381 @@ class NotionWriter:
         first_element = rich_text_array[0]
         if first_element and first_element.get('text', {}).get('content'):
             content = first_element['text']['content']
-            # Simple emoji detection (starts with emoji)
+            # Enhanced emoji detection
             if content and len(content) > 0:
                 first_char = content[0]
-                # Check if first character is emoji (simple Unicode range check)
+                # Check if first character is emoji (Unicode range check)
                 if ord(first_char) > 127:
-                    # Find end of emoji sequence
+                    # Find end of emoji sequence (handles compound emojis)
                     emoji_end = 1
-                    while emoji_end < len(content) and (len(content) <= emoji_end or ord(content[emoji_end]) > 127):
+                    while emoji_end < len(content) and ord(content[emoji_end]) > 127:
                         emoji_end += 1
-                    if emoji_end > 1 or (emoji_end == 1 and ord(first_char) >= 0x1F300):
-                        formatting_info['leading_emoji'] = content[:emoji_end].strip()
+                    # Extract emoji including space separator
+                    potential_emoji = content[:emoji_end]
+                    if emoji_end < len(content) and content[emoji_end] == ' ':
+                        emoji_end += 1
+                        potential_emoji = content[:emoji_end]
+                    if ord(first_char) >= 0x1F300 or len(potential_emoji) > 1:
+                        formatting_info['leading_emoji'] = potential_emoji.strip()
         
-        # Check for formatting patterns
+        # Comprehensive formatting pattern analysis
         for element in rich_text_array:
             annotations = element.get('annotations', {})
+            text_content = element.get('text', {}).get('content', '')
+            link_info = element.get('text', {}).get('link')
+            
+            # Track all annotation types
             if annotations:
                 if annotations.get('bold'):
                     formatting_info['has_bold'] = True
                 if annotations.get('italic'):
                     formatting_info['has_italic'] = True
-                if annotations.get('color') and annotations.get('color') != 'default':
+                if annotations.get('strikethrough'):
+                    formatting_info['has_strikethrough'] = True
+                if annotations.get('underline'):
+                    formatting_info['has_underline'] = True
+                if annotations.get('code'):
+                    formatting_info['has_code'] = True
+                
+                # Enhanced color tracking
+                color = annotations.get('color', 'default')
+                if color and color != 'default':
                     formatting_info['has_colors'] = True
-                    
-                # Store the element for pattern analysis
-                formatting_info['formatting_patterns'].append({
-                    'text': element.get('text', {}).get('content', ''),
-                    'annotations': annotations
+                    if color not in formatting_info['color_info']:
+                        formatting_info['color_info'][color] = []
+                    formatting_info['color_info'][color].append(text_content)
+            
+            # Link information tracking
+            if link_info and link_info.get('url'):
+                formatting_info['has_links'] = True
+                formatting_info['link_info'].append({
+                    'text': text_content,
+                    'url': link_info['url']
                 })
+            
+            # Store comprehensive formatting patterns
+            if annotations or link_info:
+                pattern = {
+                    'text': text_content,
+                    'annotations': annotations,
+                    'link': link_info
+                }
+                formatting_info['formatting_patterns'].append(pattern)
+            
+            # Create rich span info for detailed preservation
+            if text_content:
+                span_info = {
+                    'text': text_content,
+                    'bold': annotations.get('bold', False),
+                    'italic': annotations.get('italic', False),
+                    'strikethrough': annotations.get('strikethrough', False),
+                    'underline': annotations.get('underline', False),
+                    'code': annotations.get('code', False),
+                    'color': annotations.get('color', 'default'),
+                    'link_url': link_info.get('url') if link_info else None
+                }
+                formatting_info['rich_spans'].append(span_info)
         
         return formatting_info
+
+    def _build_detailed_formatting_description(self, formatting_info):
+        """
+        Create a detailed, human-readable description of formatting for AI context
+        
+        Args:
+            formatting_info (dict): Comprehensive formatting information
+            
+        Returns:
+            str: Human-readable formatting description for AI prompts
+        """
+        details = []
+        
+        if formatting_info.get('leading_emoji'):
+            details.append(f"- Starts with emoji: '{formatting_info['leading_emoji']}'")
+        
+        # Basic formatting flags
+        formatting_flags = []
+        if formatting_info.get('has_bold'):
+            formatting_flags.append("bold text")
+        if formatting_info.get('has_italic'):
+            formatting_flags.append("italic text")
+        if formatting_info.get('has_strikethrough'):
+            formatting_flags.append("strikethrough text")
+        if formatting_info.get('has_underline'):
+            formatting_flags.append("underlined text")
+        if formatting_info.get('has_code'):
+            formatting_flags.append("code formatting")
+            
+        if formatting_flags:
+            details.append(f"- Contains: {', '.join(formatting_flags)}")
+        
+        # Color details with formatting examples  
+        color_info = formatting_info.get('color_info', {})
+        if color_info:
+            color_details = []
+            for color, texts in color_info.items():
+                sample_text = texts[0][:20] + "..." if len(texts[0]) > 20 else texts[0]
+                color_details.append(f"[color:{color}]{sample_text}[/color]")
+            details.append(f"- Original colors to preserve: {', '.join(color_details)}")
+        
+        # Link details
+        link_info = formatting_info.get('link_info', [])
+        if link_info:
+            link_details = []
+            for link in link_info[:3]:  # Show first 3 links
+                link_text = link['text'][:20] + "..." if len(link['text']) > 20 else link['text']
+                link_details.append(f"'{link_text}' → {link['url'][:30]}...")
+            details.append(f"- Contains {len(link_info)} link(s): {', '.join(link_details)}")
+            details.append("- CRITICAL: Keep these links intact in your response")
+        
+        # Rich span analysis
+        rich_spans = formatting_info.get('rich_spans', [])
+        if rich_spans:
+            # Count different formatting combinations
+            combinations = {}
+            for span in rich_spans:
+                if span.get('link_url') or any([span.get('bold'), span.get('italic'), span.get('strikethrough'), span.get('underline'), span.get('code')]) or span.get('color', 'default') != 'default':
+                    combo_parts = []
+                    if span.get('bold'): combo_parts.append("bold")
+                    if span.get('italic'): combo_parts.append("italic")
+                    if span.get('code'): combo_parts.append("code")
+                    if span.get('color', 'default') != 'default': combo_parts.append(f"{span['color']}-colored")
+                    if span.get('link_url'): combo_parts.append("linked")
+                    
+                    combo_key = "+".join(combo_parts) if combo_parts else "plain"
+                    if combo_key not in combinations:
+                        combinations[combo_key] = []
+                    combinations[combo_key].append(span['text'][:15])
+            
+            if combinations:
+                combo_details = []
+                for combo, texts in combinations.items():
+                    sample = texts[0] + "..." if len(texts[0]) == 15 else texts[0]
+                    combo_details.append(f"{combo} ('{sample}')")
+                details.append(f"- Formatting patterns: {', '.join(combo_details)}")
+        
+        if not details:
+            return "- Plain text, no special formatting"
+            
+        return "\n".join(details)
+
+    def _validate_and_clean_ai_output(self, text):
+        """
+        Validate and clean AI output to fix common formatting issues
+        """
+        if not text:
+            return text
+            
+        # Fix common malformed patterns
+        text = text.strip()
+        
+        # Fix broken color tags (missing closing tags, etc.)
+        # Match [color:red]text without proper closing
+        text = re.sub(r'\[color:(\w+)\]([^[]*?)(?!\[/color\])', r'[color:\1]\2[/color]', text)
+        
+        # Fix duplicate links like: **[text](url)**[text](url)[/color]
+        # Remove duplicated link patterns
+        text = re.sub(r'(\[[^\]]+\]\([^)]+\))\1+', r'\1', text)
+        
+        # Fix malformed color + link combinations
+        # Pattern: **[text](url)**text[/color] -> **[text](url)**
+        text = re.sub(r'(\*\*\[[^\]]+\]\([^)]+\)\*\*)[^[]*?\[/color\]', r'\1', text)
+        
+        # Remove orphaned color closing tags
+        text = re.sub(r'\[/color\](?!\s*\[color:)', '', text)
+        
+        # Fix nested markdown issues (***text** -> ***text***)
+        text = re.sub(r'\*\*\*([^*]+)\*\*(?!\*)', r'***\1***', text)
+        
+        # Clean up multiple spaces
+        text = re.sub(r'\s+', ' ', text)
+        
+        return text.strip()
+
+    def _validate_and_convert_url(self, url):
+        """
+        Validate and convert URLs to formats acceptable by Notion
+        
+        Args:
+            url (str): Original URL from link
+            
+        Returns:
+            str or None: Valid absolute URL or None if invalid
+        """
+        if not url or not url.strip():
+            return None
+            
+        url = url.strip()
+        
+        # Already absolute URL
+        if url.startswith(('http://', 'https://')):
+            return url
+            
+        # Notion relative page URL pattern: /12672d5af2de80d4aaf8d1875acbc...
+        if url.startswith('/') and len(url) > 20:
+            # Extract page ID (remove leading slash)
+            page_id = url[1:]
+            # Convert to absolute Notion URL
+            absolute_url = f"https://www.notion.so/{page_id}"
+            logging.info(f"🔗 Converted relative URL: {url} -> {absolute_url}")
+            return absolute_url
+            
+        # Mailto links
+        if url.startswith('mailto:'):
+            return url
+            
+        # Invalid/unsupported URL format
+        logging.warning(f"⚠️ Skipping invalid URL format: {url}")
+        return None
+
+    def _parse_hybrid_markdown_to_rich_text(self, text):
+        """
+        Parse hybrid markdown + color tags to Notion rich text array
+        
+        Supported syntax:
+        - **bold** 
+        - *italic*
+        - ***bold+italic***
+        - ~~strikethrough~~
+        - `code`
+        - [color:red]text[/color]
+        - Links: [text](url) or preserved from original
+        """
+        if not text or not text.strip():
+            return [{"type": "text", "text": {"content": text or ""}}]
+        
+        # Clean and validate AI output first
+        text = self._validate_and_clean_ai_output(text)
+        
+        # Color mapping for Notion
+        color_map = {
+            'red': 'red',
+            'blue': 'blue', 
+            'green': 'green',
+            'yellow': 'yellow',
+            'orange': 'orange',
+            'purple': 'purple',
+            'pink': 'pink',
+            'gray': 'gray',
+            'grey': 'gray',
+            'brown': 'brown'
+        }
+        
+        # Step 1: Extract and preserve links first (to avoid conflicts)
+        links = []
+        link_pattern = r'\[([^\]]+)\]\(([^)]+)\)'
+        for match in re.finditer(link_pattern, text):
+            links.append({
+                'start': match.start(),
+                'end': match.end(),
+                'text': match.group(1),
+                'url': match.group(2),
+                'placeholder': f"__LINK_{len(links)}__"
+            })
+        
+        # Replace links with placeholders to avoid conflicts during formatting parsing
+        working_text = text
+        for i, link in enumerate(reversed(links)):  # Reverse to maintain positions
+            working_text = working_text[:link['start']] + link['placeholder'] + working_text[link['end']:]
+        
+        # Regex patterns for different formatting (order matters - most specific first)
+        patterns = [
+            # Color tags first (most specific)
+            (r'\[color:(\w+)\](.*?)\[/color\]', 'color'),
+            # Triple asterisks (bold+italic) before double/single
+            (r'\*\*\*(.*?)\*\*\*', 'bold_italic'),
+            # Double asterisks (bold) before single
+            (r'\*\*(.*?)\*\*', 'bold'),
+            # Single asterisks (italic) - avoid conflicts with bold patterns
+            (r'(?<!\*)\*([^*]+?)\*(?!\*)', 'italic'),
+            # Other formatting
+            (r'~~(.*?)~~', 'strikethrough'), 
+            (r'`([^`]+?)`', 'code'),
+        ]
+        
+        # Step 2: Find all formatting tokens in the working text (with link placeholders)
+        format_tokens = []
+        for pattern, format_type in patterns:
+            for match in re.finditer(pattern, working_text):
+                start, end = match.span()
+                content = match.group(1) if format_type != 'color' else match.group(2)
+                color = match.group(1) if format_type == 'color' else None
+                format_tokens.append({
+                    'start': start,
+                    'end': end, 
+                    'type': format_type,
+                    'content': content,
+                    'color': color_map.get(color.lower()) if color else None
+                })
+        
+        # Sort by start position
+        format_tokens.sort(key=lambda x: x['start'])
+        
+        # Step 3: Build rich text array from working text 
+        rich_text = []
+        current_pos = 0
+        
+        for token in format_tokens:
+            # Add any plain text before this token
+            if token['start'] > current_pos:
+                plain_part = working_text[current_pos:token['start']]
+                if plain_part:
+                    rich_text.append({
+                        "type": "text",
+                        "text": {"content": plain_part}
+                    })
+            
+            # Add the formatted token
+            annotations = {
+                'bold': token['type'] in ['bold', 'bold_italic'],
+                'italic': token['type'] in ['italic', 'bold_italic'],
+                'strikethrough': token['type'] == 'strikethrough',
+                'underline': False,
+                'code': token['type'] == 'code',
+                'color': token['color'] or 'default'
+            }
+            
+            rich_text.append({
+                "type": "text",
+                "text": {"content": token['content']},
+                "annotations": annotations
+            })
+            
+            current_pos = token['end']
+        
+        # Add any remaining plain text
+        if current_pos < len(working_text):
+            remaining_text = working_text[current_pos:]
+            if remaining_text:
+                rich_text.append({
+                    "type": "text", 
+                    "text": {"content": remaining_text}
+                })
+        
+        # If no formatting was found, use the working text
+        if not rich_text:
+            rich_text = [{"type": "text", "text": {"content": working_text}}]
+        
+        # Step 4: Restore link placeholders with actual links (with validation)
+        for i, item in enumerate(rich_text):
+            content = item.get('text', {}).get('content', '')
+            for link in links:
+                if link['placeholder'] in content:
+                    # Validate and convert URL
+                    valid_url = self._validate_and_convert_url(link['url'])
+                    
+                    # Replace placeholder with link text
+                    new_content = content.replace(link['placeholder'], link['text'])
+                    item['text']['content'] = new_content
+                    
+                    # Only add link property if URL is valid
+                    if valid_url:
+                        item['text']['link'] = {'url': valid_url}
+                        logging.info(f"🔗 Restored link: {link['text']} -> {valid_url[:50]}...")
+                    else:
+                        logging.warning(f"⚠️ Skipped invalid link: {link['text']} -> {link['url']}")
+            
+        return rich_text
 
     def _apply_intelligent_update(self, block_id, block_type, enhanced_text, original_rich_text, original_plain_text, current_block, formatting_info=None):
         """
