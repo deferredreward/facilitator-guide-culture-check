@@ -13,7 +13,13 @@ import logging
 import subprocess
 from pathlib import Path
 from dotenv import load_dotenv
+
+# Add parent directory to path for imports
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from notion_writer import NotionWriter
+
+# Add utils directory to path for utility imports  
+sys.path.append(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'utils'))
 from file_finder import find_debug_file_by_page_id_only
 
 # Setup logging

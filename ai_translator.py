@@ -16,9 +16,12 @@ from pathlib import Path
 from datetime import datetime
 from dotenv import load_dotenv
 from ai_handler import create_ai_handler
+from notion_writer import NotionWriter
+
+# Add utils directory to path for utility imports
+sys.path.append(os.path.join(os.path.dirname(__file__), 'utils'))
 from markdown_utils import clean_markdown_content
 from file_finder import find_markdown_file_by_page_id
-from notion_writer import NotionWriter
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')

@@ -1,62 +1,119 @@
 # Facilitator Guide Culture Check
 
-A comprehensive, intelligent suite for scraping, analyzing, and **non-destructively** enhancing Notion pages with advanced AI-powered content improvements. Features breakthrough formatting preservation and targeted cultural adaptations.
+An AI-powered system for enhancing Notion-based facilitator training materials with cultural adaptations, accessibility improvements, and evaluation tools. Features advanced JSON+text processing for perfect formatting preservation.
 
 ## 🎉 **RECENT BREAKTHROUGHS**
-- ✅ **Formatting Preservation Revolution**: Maintains Notion's rich text structure during AI enhancement
-- ✅ **Intelligent Block-by-Block Updates**: Real-time AI assistance with structure awareness
-- ✅ **Protected Content Safety**: Bulletproof synced block protection
-- ✅ **Visual Element Preservation**: Emojis, icons, and formatting patterns maintained
-- ✅ **Toggle Content Processing**: Discovers and enhances hidden content in collapsed sections
+- ✅ **JSON+Text AI Processing**: Revolutionary approach preserving complex Notion formatting
+- ✅ **Refactored Architecture**: Organized codebase with centralized prompt management
+- ✅ **Unified Block Editor**: Single powerful editor for all enhancement operations
+- ✅ **API Inconsistency Fixes**: Robust handling of Notion API caching issues
+- ✅ **Command Line Flexibility**: Comprehensive flag support for all operations
+
+## Overview
+
+This system provides three core functions for enhancing educational content:
+
+1. **📚 Reading Level Enhancement** - Makes content more accessible to non-native English speakers
+2. **🌍 Cultural Suggestions** - Provides cultural adaptations for training activities  
+3. **❓ Evaluation Questions** - Generates trainer evaluation questions for assessment
 - ✅ **Targeted Cultural Recommendations**: Activity-specific cultural adaptations
 
-## 🎯 Project Overview
+## 🏗️ Architecture
 
-This project provides a complete workflow for working with Notion pages:
+The system is now organized into a clean, modular architecture:
 
-1. **🔍 Intelligent Scraping**: Extract complete Notion page content with structure preservation
-2. **🤖 Advanced AI Analysis**: Block-by-block content enhancement with formatting awareness
-3. **✍️ Non-Destructive Enhancement**: Structure-preserving content improvements with synced block protection
-4. **🎯 Targeted Cultural Adaptations**: Activity-specific cultural recommendations with smart placement
-5. **📊 Comprehensive Analytics**: Dual logging system for program operations and AI interactions
+```
+├── orchestrator.py           # Main workflow controller
+├── notion_block_editor.py    # Core JSON+text block editor (NEW)
+├── prompts.txt              # Centralized prompt templates
+├── tests/                   # Test scripts and utilities
+├── utils/                   # Utility modules (file_finder, markdown_utils)
+├── logs/                    # Operation and AI interaction logs
+└── Core Modules:
+    ├── ai_handler.py            # Multi-provider AI interface
+    ├── notion_writer.py         # Notion API writing operations
+    ├── cultural_activity_analyzer.py  # Cultural adaptation analysis
+    ├── ai_question_generator.py # Evaluation question generation
+    ├── ai_reading_enhancer.py   # Reading level improvement
+    ├── ai_translator.py         # Translation capabilities
+    └── notion_scraper.py        # Notion content extraction
+```
 
-## 🚀 Features
+## 🎯 Core Functions
 
-### 📄 Notion Scraping (`notion_scraper.py`) - **ENHANCED SYSTEM**
-- **🔍 Complete page extraction** to markdown with structure preservation
-- **📊 Structured JSON export** with full block hierarchy and debug info
-- **🔄 Recursive block traversal** including nested and toggle content
-- **🎨 Rich text formatting** preservation with annotation support
-- **🧱 Advanced block support**: columns, toggles, callouts, dividers, synced blocks
-- **💾 Intelligent caching** for efficient repeated access and before/after comparison
+The system provides three main functions accessible through the orchestrator:
 
-### 🤖 AI-Powered Analysis
+1. **📚 Reading Level Enhancement**: Block-by-block content simplification for non-native speakers
+2. **🌍 Cultural Suggestions**: Activity-specific cultural adaptations with toggle placement
+3. **❓ Evaluation Questions**: AI-generated trainer assessment questions
 
-#### Cultural Activity Analyzer (`cultural_activity_analyzer.py`)
-- Analyzes activities for cultural appropriateness
-- Provides region-specific feedback
-- Supports multiple AI models (Claude, Gemini, OpenAI)
-- Generates detailed cultural sensitivity reports
+## ⚡ Quick Start
 
-#### Reading Level Enhancer (`ai_reading_enhancer.py`)
-- Improves readability for non-native English speakers
-- Targets 8th-grade reading level
-- Maintains original meaning while simplifying language
-- Multiple AI model support
+### Complete Workflow
+```bash
+# Run all three enhancements
+python orchestrator.py <PAGE_ID> --ai claude
+```
 
-### ✍️ Notion Writing (`notion_writer.py`)
-- **Non-destructive block modification**
-- **Intelligent block finding** by criteria (emojis, text patterns)
-- **Cached data utilization** for efficiency
-- **Multiple block type support** for updates
-- **Comprehensive error handling**
+### Individual Operations
+```bash
+# Reading level enhancement only
+python orchestrator.py <PAGE_ID> --only reading --ai claude
 
-### 🧪 Testing Framework (`test_notion_word_reversal.py`)
-- **Word reversal testing** for demonstration
-- **Dry-run mode** for safe testing
-- **Interactive cache refresh** options
-- **Comprehensive test coverage**
-- **Command-line interface** with multiple options
+# Cultural suggestions only  
+python orchestrator.py <PAGE_ID> --only culture --ai gemini
+
+# Evaluation questions only
+python orchestrator.py <PAGE_ID> --only questions --ai claude
+
+# Translation to target language
+python orchestrator.py <PAGE_ID> --only translation --target-lang Spanish --ai claude
+```
+
+### Advanced Options
+```bash
+# Dry run (no changes)
+python orchestrator.py <PAGE_ID> --dry-run --ai claude
+
+# Limit processing & debug
+python orchestrator.py <PAGE_ID> --num-blocks 5 --debug --ai claude
+
+# Custom prompts
+python orchestrator.py <PAGE_ID> --prompt-from-file custom.txt --section Reading
+```
+
+### Direct Block Editor
+```bash
+# Advanced JSON+text processing
+python notion_block_editor.py <PAGE_ID> --ai claude --section Reading --limit 10 --debug
+```
+
+## 🚀 Key Features
+
+### 🎯 JSON+Text AI Processing (`notion_block_editor.py`)
+- **Revolutionary formatting preservation** using Notion's native JSON structure
+- **Recursive block processing** with API inconsistency handling
+- **Multiple AI provider support** (Claude, Gemini, OpenAI, xAI)
+- **Configurable prompt system** with section-based templates
+- **Advanced debugging** and dry-run capabilities
+
+### 🌍 Cultural Analysis (`cultural_activity_analyzer.py`)
+- **Activity-specific cultural guidance** with toggle block placement
+- **Multi-dimensional analysis** (power distance, individualism, etc.)
+- **Region-specific recommendations** for global training programs
+- **Intelligent content insertion** after detected activities
+
+### 📚 Reading Enhancement (`ai_reading_enhancer.py`)
+- **8th-grade level simplification** for non-native speakers
+- **Technical term preservation** with accessible explanations
+- **Active voice preference** and sentence structure improvements
+- **Format-aware processing** maintaining rich text styling
+
+### ❓ Question Generation (`ai_question_generator.py`)
+- **Diagnostic evaluation questions** for trainer assessment
+- **Open-ended scenario-based** questioning approach
+- **Pre/post training application** for knowledge gap identification
+- **Professional language** suitable for diverse learners
 
 ## 🚀 **QUICK START - ORCHESTRATOR**
 

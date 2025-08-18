@@ -7,14 +7,18 @@ including finding specific blocks and updating their content.
 """
 
 import os
+import sys
 import json
 import logging
 import re
 from pathlib import Path
 from notion_client import Client
 from dotenv import load_dotenv
-from file_finder import find_debug_file_by_page_id_only
 import time
+
+# Add utils directory to path for utility imports
+sys.path.append(os.path.join(os.path.dirname(__file__), 'utils'))
+from file_finder import find_debug_file_by_page_id_only
 
 # Load environment variables
 load_dotenv()
