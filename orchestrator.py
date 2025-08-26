@@ -4,9 +4,9 @@ Orchestrator Script - Complete AI Enhancement Workflow
 
 This script orchestrates the full workflow:
 1. Scrape Notion page
-2. Generate trainer evaluation questions -> Insert near bottom as "Trainer Evaluation Questions"
-3. Generate cultural adaptations -> Insert toggle blocks after activities
-4. Enhance readability -> Replace page content with simplified version
+2. Enhance readability -> Replace page content with ESL-accessible simplified version
+3. Generate trainer evaluation questions -> Insert near bottom as "Trainer Evaluation Questions"
+4. Generate cultural adaptations -> Insert toggle blocks after activities
 
 Usage:
     python orchestrator.py <page_id> --ai <model_type>
@@ -133,9 +133,9 @@ def log_ai_interaction(prompt, response, model_type, operation):
         ai_logger = logging.getLogger('ai_interactions')
         ai_logger.info(f"=== {operation.upper()} ===")
         ai_logger.info(f"Model: {model_type}")
-        ai_logger.info(f"Prompt (first 200 chars): {prompt[:200]}...")
-        ai_logger.info(f"Response (first 500 chars): {response[:500]}...")
-        ai_logger.info(f"Full response length: {len(response)} characters")
+        ai_logger.info(f"FULL PROMPT:\n{prompt}")
+        ai_logger.info(f"FULL RESPONSE:\n{response}")
+        ai_logger.info(f"Response length: {len(response)} characters")
         ai_logger.info("=" * 60)
         # Also log to main logger for now
         logging.info(f"AI Interaction logged: {operation} with {model_type}")
@@ -198,22 +198,37 @@ def load_reading_prompt_from_txt(path: str = "prompts.txt") -> str:
 class NotionOrchestrator:
     """Orchestrates the complete AI enhancement workflow"""
     
-    def __init__(self, ai_model='claude', dry_run=False, num_blocks=None):
+    def __init__(self, reading_ai='claude', questions_ai='claude', culture_ai='claude', dry_run=False, num_blocks=None):
         """
         Initialize orchestrator
         
         Args:
-            ai_model (str): AI model to use ('claude', 'gemini', 'openai')
+            reading_ai (str): AI model to use for reading level adaptation ('claude', 'gemini', 'openai', 'xai')
+            questions_ai (str): AI model to use for trainer questions ('claude', 'gemini', 'openai', 'xai')
+            culture_ai (str): AI model to use for cultural suggestions ('claude', 'gemini', 'openai', 'xai')
             dry_run (bool): If True, show what would be done without making changes
             num_blocks (int): Limit number of blocks to process (for testing)
         """
-        self.ai_model = ai_model
+        self.reading_ai = reading_ai
+        self.questions_ai = questions_ai
+        self.culture_ai = culture_ai
+        # Keep backward compatibility
+        self.ai_model = reading_ai  # Default fallback
         self.dry_run = dry_run
         self.num_blocks = num_blocks
         self.writer = NotionWriter()
-        self.ai_handler = AIHandler(ai_model)
         
-        logging.info(f"🚀 Orchestrator initialized with AI model: {ai_model}")
+        # Create AI handlers for each task
+        self.reading_ai_handler = AIHandler(reading_ai)
+        self.questions_ai_handler = AIHandler(questions_ai)
+        self.culture_ai_handler = AIHandler(culture_ai)
+        # Keep for backward compatibility
+        self.ai_handler = self.reading_ai_handler
+        
+        logging.info(f"🚀 Orchestrator initialized with AI models:")
+        logging.info(f"  📚 Reading: {reading_ai}")
+        logging.info(f"  ❓ Questions: {questions_ai}")
+        logging.info(f"  🌍 Culture: {culture_ai}")
         if dry_run:
             logging.info("🔍 DRY RUN MODE - No actual changes will be made")
     
@@ -229,7 +244,11 @@ class NotionOrchestrator:
         """
         workflow_results = {
             'page_id': page_id,
-            'ai_model': self.ai_model,
+            'ai_models': {
+                'reading': self.reading_ai,
+                'questions': self.questions_ai,
+                'culture': self.culture_ai
+            },
             'dry_run': self.dry_run,
             'timestamp': datetime.now().isoformat(),
             'steps': {}
@@ -244,20 +263,20 @@ class NotionOrchestrator:
             if not scrape_result['success']:
                 return workflow_results
             
-            # Step 2: Generate trainer questions and insert
-            logging.info("❓ Step 2: Generating trainer evaluation questions...")
+            # Step 2: Enhance readability first (ESL English enhancement)
+            logging.info("📚 Step 2: Enhancing readability for ESL accessibility...")
+            reading_result = self._enhance_readability(page_id)
+            workflow_results['steps']['reading'] = reading_result
+            
+            # Step 3: Generate trainer questions and insert
+            logging.info("❓ Step 3: Generating trainer evaluation questions...")
             questions_result = self._generate_and_insert_questions(page_id)
             workflow_results['steps']['questions'] = questions_result
             
-            # Step 3: Generate cultural adaptations and insert
-            logging.info("🌍 Step 3: Generating cultural adaptations...")
+            # Step 4: Generate cultural adaptations and insert (do this last)
+            logging.info("🌍 Step 4: Generating cultural adaptations...")
             culture_result = self._generate_and_insert_cultural_adaptations(page_id)
             workflow_results['steps']['culture'] = culture_result
-            
-            # Step 4: Enhance readability (do this last as it modifies content)
-            logging.info("📚 Step 4: Enhancing readability...")
-            reading_result = self._enhance_readability(page_id)
-            workflow_results['steps']['reading'] = reading_result
             
             # Overall success
             # Consider success only if reading step updated any blocks or culture inserted any blocks
@@ -312,8 +331,8 @@ class NotionOrchestrator:
                     'error': 'Failed to read markdown content'
                 }
             
-            # Generate questions
-            questions_content = generate_questions_with_ai(content, self.ai_model)
+            # Generate questions using questions-specific AI
+            questions_content = generate_questions_with_ai(content, self.questions_ai)
             
             if not questions_content:
                 return {
@@ -359,7 +378,7 @@ class NotionOrchestrator:
                 content = read_markdown_content(markdown_file)
                 if not content:
                     return {'success': False, 'error': 'Failed to read markdown for fallback'}
-                cultural_content = analyze_content_with_ai(content, self.ai_model)
+                cultural_content = analyze_content_with_ai(content, self.culture_ai)
                 if not cultural_content:
                     return {'success': False, 'error': 'Cultural analysis failed'}
                 insertion_result = self._insert_cultural_adaptations(page_id, cultural_content)
@@ -389,8 +408,8 @@ class NotionOrchestrator:
                             "Analyze the activity below for cultural appropriateness. Provide brief adaptations and alternatives.\n\n{content}"
                         )
                     prompt = culture_template.replace('{content}', sec['content_text'])
-                    analysis = self.ai_handler.get_response(prompt, max_tokens=3000, temperature=0.4)
-                    log_ai_interaction(prompt, analysis or '', self.ai_model, 'CULTURAL_ACTIVITY')
+                    analysis = self.culture_ai_handler.get_response(prompt, max_tokens=3000, temperature=0.4)
+                    log_ai_interaction(prompt, analysis or '', self.culture_ai, 'CULTURAL_ACTIVITY')
                     if not analysis:
                         continue
                     title = f"🌍 Cultural guidance for: {sec['label'][:60]}"
@@ -428,7 +447,7 @@ class NotionOrchestrator:
             # Use the new block editor with JSON+text AI processing
             test_whole_page_json_edit(
                 page_id=page_id,
-                ai_model=self.ai_model,
+                ai_model=self.reading_ai,
                 dry_run=self.dry_run,
                 dry_dry_run=False,
                 limit_blocks=self.num_blocks,
@@ -463,9 +482,10 @@ class NotionOrchestrator:
             logging.warning("⚠️ Translation feature needs enhancement to support target language parameter")
             
             # Use the new block editor - for now using Reading section as translation isn't fully supported yet
+            # TODO: Add translation-specific AI model parameter
             test_whole_page_json_edit(
                 page_id=page_id,
-                ai_model=self.ai_model,
+                ai_model=self.reading_ai,  # Use reading AI for translation for now
                 dry_run=self.dry_run,
                 dry_dry_run=False,
                 limit_blocks=self.num_blocks,
@@ -561,7 +581,13 @@ def main():
     parser = argparse.ArgumentParser(description='Run complete AI enhancement workflow on Notion page')
     parser.add_argument('page_id', help='Notion page ID or URL')
     parser.add_argument('--ai', default='claude', choices=['claude', 'gemini', 'openai', 'xai'],
-                      help='AI model to use (default: claude)')
+                      help='AI model to use for all tasks (default: claude) - can be overridden by specific flags')
+    parser.add_argument('--reading-ai', choices=['claude', 'gemini', 'openai', 'xai'],
+                      help='AI model specifically for reading level adaptation (overrides --ai)')
+    parser.add_argument('--questions-ai', choices=['claude', 'gemini', 'openai', 'xai'],
+                      help='AI model specifically for trainer questions (overrides --ai)')
+    parser.add_argument('--culture-ai', choices=['claude', 'gemini', 'openai', 'xai'],
+                      help='AI model specifically for cultural suggestions (overrides --ai)')
     parser.add_argument('--dry-run', action='store_true',
                       help='Show what would be done without making changes')
     parser.add_argument('--only', choices=['scrape', 'questions', 'culture', 'reading', 'translation'],
@@ -583,8 +609,19 @@ def main():
     logging.info(f"�� Input: {args.page_id}")
     logging.info(f"🎯 Extracted Page ID: {clean_page_id}")
     
+    # Determine AI models to use
+    reading_ai = args.reading_ai if args.reading_ai else args.ai
+    questions_ai = args.questions_ai if args.questions_ai else args.ai
+    culture_ai = args.culture_ai if args.culture_ai else args.ai
+    
     # Initialize orchestrator
-    orchestrator = NotionOrchestrator(ai_model=args.ai, dry_run=args.dry_run, num_blocks=args.num_blocks)
+    orchestrator = NotionOrchestrator(
+        reading_ai=reading_ai,
+        questions_ai=questions_ai,
+        culture_ai=culture_ai,
+        dry_run=args.dry_run,
+        num_blocks=args.num_blocks
+    )
     
     # Handle force refresh
     if args.force_refresh:
@@ -636,7 +673,11 @@ def main():
     print("🎯 WORKFLOW RESULTS SUMMARY")
     print("="*60)
     print(f"Page ID: {results.get('page_id', 'N/A')}")
-    print(f"AI Model: {results.get('ai_model', 'N/A')}")
+    ai_models = results.get('ai_models', {})
+    print(f"AI Models:")
+    print(f"  📚 Reading: {ai_models.get('reading', 'N/A')}")
+    print(f"  ❓ Questions: {ai_models.get('questions', 'N/A')}")
+    print(f"  🌍 Culture: {ai_models.get('culture', 'N/A')}")
     print(f"Dry Run: {results.get('dry_run', 'N/A')}")
     print(f"Overall Success: {results.get('success', False)}")
     print(f"Timestamp: {results.get('timestamp', 'N/A')}")

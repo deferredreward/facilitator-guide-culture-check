@@ -855,6 +855,104 @@ class NotionWriter:
             }
         }
     
+    def create_table_block(self, table_width, has_column_header=True, has_row_header=False, children=None):
+        """
+        Create a table block data structure
+        
+        Args:
+            table_width (int): Number of columns in the table
+            has_column_header (bool): Whether first row is a header
+            has_row_header (bool): Whether first column is a header
+            children (list): Optional list of table_row blocks
+            
+        Returns:
+            dict: Block data for table
+        """
+        table_block = {
+            "object": "block",
+            "type": "table",
+            "table": {
+                "table_width": table_width,
+                "has_column_header": has_column_header,
+                "has_row_header": has_row_header
+            }
+        }
+        
+        # Add children if provided
+        if children:
+            table_block["table"]["children"] = children
+            
+        return table_block
+    
+    def create_table_row_block(self, cells):
+        """
+        Create a table row block data structure
+        
+        Args:
+            cells (list): List of cell contents (strings)
+            
+        Returns:
+            dict: Block data for table row
+        """
+        rich_cells = []
+        for cell in cells:
+            if isinstance(cell, str):
+                rich_cells.append(self._markdown_to_rich_text(cell))
+            else:
+                rich_cells.append(cell)  # Assume it's already rich text
+        
+        return {
+            "object": "block",
+            "type": "table_row",
+            "table_row": {
+                "cells": rich_cells
+            }
+        }
+    
+    def parse_markdown_table(self, lines, start_idx):
+        """
+        Parse markdown table starting at start_idx and return table block with rows
+        
+        Args:
+            lines (list): List of markdown lines
+            start_idx (int): Index where table starts
+            
+        Returns:
+            tuple: (table_block, next_line_idx)
+        """
+        table_rows = []
+        i = start_idx
+        
+        while i < len(lines):
+            line = lines[i].strip()
+            if not line.startswith('|') or not line.endswith('|'):
+                break
+            
+            # Skip separator lines (|---|---|---|) - more robust pattern
+            if re.match(r'^\|[\s\-\|:]+\|?$', line) and '--' in line:
+                logging.info(f"🔧 Skipping table separator line: {line}")
+                i += 1
+                continue
+                
+            # Parse table row
+            cells = [cell.strip() for cell in line.split('|')[1:-1]]  # Remove empty first/last
+            if cells:
+                table_rows.append(cells)
+            i += 1
+        
+        if not table_rows:
+            return None, start_idx + 1
+            
+        # Create table block with special metadata for later processing
+        num_columns = len(table_rows[0]) if table_rows else 1
+        table_block = self.create_table_block(num_columns, has_column_header=True)
+        
+        # Store table rows for later API calls (can't add children directly to table block)
+        table_block["_table_rows"] = table_rows
+        table_block["_needs_special_handling"] = True
+        
+        return table_block, i
+
     def _markdown_to_rich_text(self, text: str):
         """Convert simple markdown (**bold**, *italic*, `code`) to Notion rich_text array."""
         parts = re.split(r"(\*\*.*?\*\*|\*.*?\*|`.*?`)", text)
@@ -900,17 +998,28 @@ class NotionWriter:
         """
         blocks = []
         lines = markdown_text.split('\n')
+        i = 0
         
-        for line in lines:
-            line = line.strip()
+        while i < len(lines):
+            line = lines[i].strip()
             if not line:
+                i += 1
                 continue
+            
+            # Check for table start
+            if line.startswith('|') and line.endswith('|'):
+                table_block, next_i = self.parse_markdown_table(lines, i)
+                if table_block:
+                    blocks.append(table_block)
+                    i = next_i
+                    continue
                 
             # Handle headings
             if line.startswith('### '):
                 blocks.append(self.create_heading_block(line[4:], 3))
             elif line.startswith('## '):
-                blocks.append(self.create_heading_block(line[3:], 2))
+                # Skip creating heading blocks for ## (used for parsing structure only)
+                pass
             elif line.startswith('# '):
                 blocks.append(self.create_heading_block(line[2:], 1))
             # Handle special formatting
@@ -943,6 +1052,8 @@ class NotionWriter:
                         "type": "paragraph",
                         "paragraph": {"rich_text": rich}
                     })
+            
+            i += 1
         
         return blocks
     
@@ -1058,21 +1169,46 @@ class NotionWriter:
     def append_cultural_toggle_to_container(self, container_block_id: str, title: str, markdown_content: str, max_blocks: int = 40):
         """Append a toggle titled `title` with parsed markdown content as children under the container block."""
         try:
+            # Check if container is accessible (not archived/deleted)
+            if not self._is_block_accessible(container_block_id):
+                logging.warning(f"🚫 SKIP: Container {container_block_id[:8]}... is archived or deleted")
+                return {'success': True, 'skipped': True, 'reason': 'archived_or_deleted'}
+                
             # Guard synced ancestry
             if self._is_block_or_ancestor_synced_api(container_block_id):
                 logging.warning(f"🚫 PROTECTED: Skipping cultural toggle under synced content {container_block_id[:8]}...")
-                return {'success': True, 'skipped': True}
+                return {'success': True, 'skipped': True, 'reason': 'synced_content'}
+                
             # Idempotency: skip if exists
             title_prefix = title.split(':')[0].strip() if ':' in title else title
             if self._child_toggle_exists(container_block_id, title_prefix):
                 logging.info("♻️ Cultural toggle already exists; skipping")
-                return {'success': True, 'skipped': True}
+                return {'success': True, 'skipped': True, 'reason': 'already_exists'}
 
             # Build structured children if possible
             children_blocks = self.build_cultural_guidance_children(markdown_content)[:max_blocks]
-            toggle_block = self.create_toggle_block(title, children_blocks)
+            
+            # Handle table blocks that need special creation
+            processed_children = []
+            for child_block in children_blocks:
+                if child_block.get("_create_table_with_rows"):
+                    # Skip table blocks for now - they need special handling
+                    # TODO: Implement proper table creation after toggle is created
+                    continue
+                else:
+                    processed_children.append(child_block)
+            
+            toggle_block = self.create_toggle_block(title, processed_children)
             try:
                 result = self.client.blocks.children.append(container_block_id, children=[toggle_block])
+                
+                # Now handle any table blocks that were deferred
+                toggle_id = result['results'][0]['id'] if result.get('results') else None
+                if toggle_id:
+                    for child_block in children_blocks:
+                        if child_block.get("_create_table_with_rows"):
+                            self._create_table_with_rows(toggle_id, child_block["_create_table_with_rows"])
+                
                 return {'success': True, 'response': result}
             except Exception as e:
                 # Fallback: append to parent of the container
@@ -1107,9 +1243,29 @@ class NotionWriter:
             logging.warning(f"⚠️ Could not get toggle children: {e}")
             return []
 
+    def _is_block_accessible(self, block_id: str) -> bool:
+        """Check if a block exists and is not archived."""
+        try:
+            block = self.client.blocks.retrieve(block_id)
+            if block.get('archived', False):
+                logging.warning(f"📁 Block {block_id[:8]}... is archived")
+                return False
+            return True
+        except Exception as e:
+            if "Could not find block" in str(e) or "404" in str(e):
+                logging.warning(f"🚫 Block {block_id[:8]}... not found (likely deleted)")
+                return False
+            logging.warning(f"⚠️ Could not access block {block_id[:8]}...: {e}")
+            return False
+
     def _child_toggle_exists(self, container_block_id: str, title_prefix: str) -> bool:
         """Return True if a child toggle under container starts with title_prefix."""
         try:
+            # First check if the container is accessible
+            if not self._is_block_accessible(container_block_id):
+                logging.warning(f"🚫 Cannot check toggles: container {container_block_id[:8]}... is not accessible")
+                return False
+                
             resp = self.client.blocks.children.list(container_block_id)
             for child in resp.get('results', []):
                 if child.get('type') != 'toggle':
@@ -1118,7 +1274,10 @@ class NotionWriter:
                 if text.strip().startswith(title_prefix):
                     return True
         except Exception as e:
-            logging.warning(f"⚠️ Could not check existing toggles: {e}")
+            if "Could not find block" in str(e) or "404" in str(e):
+                logging.warning(f"🚫 Container {container_block_id[:8]}... not found (likely deleted)")
+            else:
+                logging.warning(f"⚠️ Could not check existing toggles: {e}")
         return False
 
     def _build_section_toggle(self, title: str, items: list) -> dict:
@@ -1261,7 +1420,71 @@ class NotionWriter:
         if children:
             return children
         # Fallback: flat conversion
-        return self.parse_markdown_to_blocks(markdown_text)
+        parsed_blocks = self.parse_markdown_to_blocks(markdown_text)
+        # Handle table blocks that need special processing
+        return self._process_special_blocks(parsed_blocks)
+    
+    def _process_special_blocks(self, blocks):
+        """
+        Process blocks that need special API handling (like tables)
+        
+        Args:
+            blocks (list): List of parsed blocks
+            
+        Returns:
+            list: Processed blocks with table creation deferred
+        """
+        processed_blocks = []
+        
+        for block in blocks:
+            if block.get("_needs_special_handling") and block.get("type") == "table":
+                # Store table creation info for later processing
+                table_rows = block.get("_table_rows", [])
+                if table_rows:
+                    # Mark block for special table creation
+                    table_block = self.create_table_block(
+                        len(table_rows[0]) if table_rows else 1, 
+                        has_column_header=True
+                    )
+                    table_block["_create_table_with_rows"] = table_rows
+                    processed_blocks.append(table_block)
+                else:
+                    processed_blocks.append(block)
+            else:
+                processed_blocks.append(block)
+        
+        return processed_blocks
+    
+    def _create_table_with_rows(self, parent_block_id: str, table_rows: list):
+        """
+        Create a table block with rows using the Notion API
+        
+        Args:
+            parent_block_id (str): Parent block to append table to
+            table_rows (list): List of row data (list of cell strings)
+        """
+        try:
+            if not table_rows:
+                return
+                
+            num_columns = len(table_rows[0])
+            
+            # Create table rows first
+            row_blocks = []
+            for row_cells in table_rows:
+                # Ensure all rows have the same number of columns
+                while len(row_cells) < num_columns:
+                    row_cells.append("")
+                row_blocks.append(self.create_table_row_block(row_cells[:num_columns]))
+            
+            # Create the table block with all rows included
+            table_block = self.create_table_block(num_columns, has_column_header=True, children=row_blocks)
+            logging.info(f"🔍 Creating table block with {len(row_blocks)} rows")
+            result = self.client.blocks.children.append(parent_block_id, children=[table_block])
+            logging.info(f"✅ Created table with {len(row_blocks)} rows")
+                
+        except Exception as e:
+            logging.error(f"❌ Failed to create table: {e}")
     
     def find_activity_blocks(self, page_id):
         """
@@ -1324,6 +1547,7 @@ class NotionWriter:
     def insert_trainer_questions_section(self, page_id, questions_markdown):
         """
         Insert a "Trainer Evaluation Questions" section with the provided questions
+        Tries to place after "Conclusion" and before "Course Materials", otherwise at the end
         
         Args:
             page_id (str): The Notion page ID
@@ -1342,11 +1566,173 @@ class NotionWriter:
             question_blocks = self.parse_markdown_to_blocks(questions_markdown)
             section_blocks.extend(question_blocks)
             
-            # Append to the page
-            return self.append_blocks_to_page(page_id, section_blocks)
+            # Try to find the optimal insertion point
+            insertion_point = self._find_trainer_questions_insertion_point(page_id)
+            
+            if insertion_point:
+                # Insert at the specific location
+                return self.insert_blocks_at_position(page_id, section_blocks, insertion_point)
+            else:
+                # Fallback to appending at the end
+                logging.info("📍 No ideal insertion point found, adding trainer questions at end of document")
+                return self.append_blocks_to_page(page_id, section_blocks)
             
         except Exception as e:
             logging.error(f"❌ Error inserting trainer questions: {e}")
+            return {
+                'success': False,
+                'error': str(e),
+                'blocks_added': 0
+            }
+    
+    def _find_trainer_questions_insertion_point(self, page_id):
+        """
+        Find the best insertion point for trainer questions:
+        1. After "Conclusion" heading
+        2. Before "Course Materials" heading
+        3. Return None if neither is found (will append at end)
+        
+        Args:
+            page_id (str): The Notion page ID
+            
+        Returns:
+            str: Block ID to insert after, or None
+        """
+        try:
+            # Get all blocks from the page
+            all_blocks = self.get_all_page_blocks(page_id)
+            
+            conclusion_block_id = None
+            course_materials_block_id = None
+            
+            # Look for end-section headings (expanded list)
+            conclusion_keywords = ['conclusion', 'summary', 'wrap', 'wrap up', 'wrap-up', 'next steps', 'review', 'closing']
+            materials_keywords = ['course materials', 'course material', 'resources', 'handouts', 'materials', 'appendix', 'references']
+            
+            for block in all_blocks:
+                if block.get('type') == 'heading_1' or block.get('type') == 'heading_2' or block.get('type') == 'heading_3':
+                    heading_text = self.extract_plain_text_from_rich_text(
+                        block.get(block['type'], {}).get('rich_text', [])
+                    ).lower()
+                    
+                    # Check for conclusion-type headings
+                    for keyword in conclusion_keywords:
+                        if keyword in heading_text:
+                            conclusion_block_id = block['id']
+                            logging.info(f"📍 Found conclusion-type heading '{heading_text}' at block {conclusion_block_id}")
+                            break
+                    
+                    # Check for materials-type headings  
+                    for keyword in materials_keywords:
+                        if keyword in heading_text:
+                            course_materials_block_id = block['id']
+                            logging.info(f"📍 Found materials-type heading '{heading_text}' at block {course_materials_block_id}")
+                            break
+            
+            # Determine insertion point based on what we found
+            if conclusion_block_id and course_materials_block_id:
+                # Find the last block after conclusion but before course materials
+                insert_after_id = self._find_last_block_before_target(all_blocks, conclusion_block_id, course_materials_block_id)
+                if insert_after_id:
+                    logging.info(f"📍 Will insert trainer questions after conclusion and before course materials (after block {insert_after_id})")
+                    return insert_after_id
+            
+            if conclusion_block_id:
+                # Find the last block in the conclusion section
+                insert_after_id = self._find_last_block_in_section(all_blocks, conclusion_block_id)
+                if insert_after_id:
+                    logging.info(f"📍 Will insert trainer questions after conclusion section (after block {insert_after_id})")
+                    return insert_after_id
+            
+            if course_materials_block_id:
+                # Insert just before course materials
+                insert_before_index = next((i for i, block in enumerate(all_blocks) if block['id'] == course_materials_block_id), None)
+                if insert_before_index and insert_before_index > 0:
+                    insert_after_id = all_blocks[insert_before_index - 1]['id']
+                    logging.info(f"📍 Will insert trainer questions before course materials (after block {insert_after_id})")
+                    return insert_after_id
+            
+            logging.info("📍 No end-section headings found, using 90% position fallback")
+            
+            # Fallback: insert at 90% through the document instead of the very end
+            if all_blocks:
+                insertion_position = int(len(all_blocks) * 0.9)
+                if insertion_position > 0 and insertion_position < len(all_blocks):
+                    fallback_insert_after_id = all_blocks[insertion_position - 1]['id']
+                    logging.info(f"📍 Will insert trainer questions at 90% position (after block {fallback_insert_after_id})")
+                    return fallback_insert_after_id
+            
+            return None
+            
+        except Exception as e:
+            logging.error(f"❌ Error finding insertion point: {e}")
+            return None
+    
+    def _find_last_block_before_target(self, all_blocks, start_block_id, target_block_id):
+        """Find the last block after start_block_id but before target_block_id"""
+        try:
+            start_index = next((i for i, block in enumerate(all_blocks) if block['id'] == start_block_id), None)
+            target_index = next((i for i, block in enumerate(all_blocks) if block['id'] == target_block_id), None)
+            
+            if start_index is not None and target_index is not None and target_index > start_index:
+                # Return the block just before the target
+                return all_blocks[target_index - 1]['id']
+            return None
+        except Exception:
+            return None
+    
+    def _find_last_block_in_section(self, all_blocks, heading_block_id):
+        """Find the last block in a section defined by a heading"""
+        try:
+            heading_index = next((i for i, block in enumerate(all_blocks) if block['id'] == heading_block_id), None)
+            if heading_index is None:
+                return None
+            
+            # Look for the next heading or end of document
+            for i in range(heading_index + 1, len(all_blocks)):
+                block = all_blocks[i]
+                if block.get('type') in ['heading_1', 'heading_2']:
+                    # Found next heading, return the previous block
+                    return all_blocks[i - 1]['id']
+            
+            # No next heading found, return the last block
+            if len(all_blocks) > heading_index + 1:
+                return all_blocks[-1]['id']
+            
+            return heading_block_id  # Only the heading exists
+        except Exception:
+            return None
+    
+    def insert_blocks_at_position(self, page_id, blocks_to_insert, insert_after_block_id):
+        """
+        Insert blocks at a specific position in the page (after the specified block)
+        
+        Args:
+            page_id (str): The Notion page ID
+            blocks_to_insert (list): List of block objects to insert
+            insert_after_block_id (str): Block ID to insert after
+            
+        Returns:
+            dict: Results of the insertion operation
+        """
+        try:
+            # Use Notion's API to insert blocks after the specified block
+            response = self.client.blocks.children.append(
+                block_id=insert_after_block_id,
+                children=blocks_to_insert
+            )
+            
+            logging.info(f"✅ Successfully inserted {len(blocks_to_insert)} blocks after {insert_after_block_id}")
+            
+            return {
+                'success': True,
+                'blocks_added': len(blocks_to_insert),
+                'inserted_after': insert_after_block_id,
+                'response': response
+            }
+            
+        except Exception as e:
+            logging.error(f"❌ Error inserting blocks at position: {e}")
             return {
                 'success': False,
                 'error': str(e),
@@ -1532,6 +1918,18 @@ class NotionWriter:
             # For large requests or no limit, fall back to full recursive fetch
             logging.info("📡 No cached data available, falling back to full API fetch...")
             return self._get_all_blocks_recursively(page_id)
+    
+    def get_all_page_blocks(self, page_id):
+        """
+        Get all blocks from a page - wrapper around _get_blocks_efficiently
+        
+        Args:
+            page_id (str): Notion page ID
+            
+        Returns:
+            list: All blocks from the page
+        """
+        return self._get_blocks_efficiently(page_id)
     
     def _get_limited_blocks(self, page_id, limit):
         """

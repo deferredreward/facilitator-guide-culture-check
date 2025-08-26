@@ -245,7 +245,27 @@ def get_ai_translation_prompt(content, target_language):
     if not base:
         base = "Please translate the following content to {target_language} while preserving formatting.\n\n{content}"
     
-    return base.replace("{target_language}", target_language).replace("{content}", content)
+    # Handle both old format ({target_language}, {content}) and new format ({block_type}, etc.)
+    if "{target_language}" in base and "{content}" in base:
+        # Old simple format
+        return base.replace("{target_language}", target_language).replace("{content}", content)
+    elif "{current_plain_text}" in base:
+        # New format with detailed variables
+        try:
+            return base.format(
+                block_type="text_content",
+                current_plain_text=content,
+                detailed_formatting="Standard text formatting preservation",
+                context_info="Text-based translation processing",
+                target_language=target_language
+            )
+        except KeyError as e:
+            logging.warning(f"Missing variable in translation prompt: {e}")
+            # Fallback to simple replacement
+            return f"Translate the following to {target_language} while preserving formatting:\n\n{content}"
+    else:
+        # Fallback for any other format
+        return f"Translate the following to {target_language} while preserving formatting:\n\n{content}"
 
 def translate_content_with_ai(content, target_language, ai_choice):
     """Translate content using the shared AI handler"""

@@ -26,3 +26,10 @@ OBS-Introduction-Activity-Do-25072d5af2de80aa8826e409cf305aaa
 How-to-Externally-Check-OBS-25072d5af2de805d975ed128fc30b644
 How-to-Draft-Internally-Check-OBS-25072d5af2de80a689edc792953a6e69
 How-to-Distribute-Open-Bible-Stories-OBS-25072d5af2de805b8b26eb959f8f371c
+
+# ignore
+gem pro page: 25372d5af2de80b99157e291f353611b
+claude 4 son page: 25372d5af2de8076ba29fc9efd83c345
+grok 4 page: 25372d5af2de80e690b8fa0a8d0719b4
+
+translate test (gem gem): 25472d5af2de80338018daf32f7a1177

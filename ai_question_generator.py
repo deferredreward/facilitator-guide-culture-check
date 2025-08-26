@@ -107,10 +107,10 @@ def load_trainer_questions_prompt():
         found_prompt_start = False
         
         for line in lines:
-            if 'prompt = f"""' in line:
+            if line.strip().startswith('"""'):
                 found_prompt_start = True
-                # Get the part after the f"""
-                prompt_start = line.split('prompt = f"""')[1]
+                # Get the part after the opening quotes
+                prompt_start = line.strip()[3:]
                 if prompt_start:
                     prompt_lines.append(prompt_start)
             elif found_prompt_start:
@@ -126,19 +126,8 @@ def load_trainer_questions_prompt():
         
         # Join the lines and clean up indentation
         prompt_template = '\n'.join(prompt_lines)
-        # Remove leading whitespace from each line consistently
-        cleaned_lines = []
-        for line in prompt_template.split('\n'):
-            if line.strip():  # Non-empty lines
-                # Remove up to 4 leading spaces
-                if line.startswith('    '):
-                    cleaned_lines.append(line[4:])
-                else:
-                    cleaned_lines.append(line)
-            else:
-                cleaned_lines.append('')  # Preserve empty lines
         
-        return '\n'.join(cleaned_lines)
+        return prompt_template
         
     except Exception as e:
         logging.error(f"❌ Error loading trainer questions prompt: {e}")
