@@ -1,0 +1,430 @@
+🚀 Processing 24 pages...
+🔍 Scanning page: Understanding Authorial Intent FG (24f72d5a...)
+    📊 Found 136 total blocks (including nested)
+   ✅ Found 4 synced blocks
+🔍 Scanning page: Translation Drafting FG (24f72d5a...)
+    📊 Found 127 total blocks (including nested)
+   ✅ Found 2 synced blocks
+🔍 Scanning page: Testing your Translation with the Community FG (24f72d5a...)
+    📊 Found 176 total blocks (including nested)
+   ✅ Found 3 synced blocks
+🔍 Scanning page: Qualities of Good Bible Translation  FG (24f72d5a...)
+    📊 Found 187 total blocks (including nested)
+   ✅ Found 3 synced blocks
+🔍 Scanning page: Planning Your Translation Process - FG (24f72d5a...)
+    📊 Found 287 total blocks (including nested)
+   ✅ Found 1 synced blocks
+🔍 Scanning page: Form & Meaning FG (24f72d5a...)
+    📊 Found 235 total blocks (including nested)
+   ✅ Found 6 synced blocks
+🔍 Scanning page: Church Leader Checking FG (24f72d5a...)
+    📊 Found 137 total blocks (including nested)
+   ✅ Found 2 synced blocks
+🔍 Scanning page: Error getting title: Could not find page with ID: 24f72d5a-f2de-80f5-8b86-d162fec0c992. Make sure the relevant pages and databases are shared with your integration. (24f72d5a...)
+    Error fetching blocks: Could not find block with ID: 24f72d5a-f2de-80f5-8b86-d162fec0c992. Make sure the relevant pages and databases are shared with your integration.
+    📊 Found 0 total blocks (including nested)
+   ❌ No synced blocks found
+🔍 Scanning page: CCBT Cycle Role Play FG (24f72d5a...)
+    📊 Found 123 total blocks (including nested)
+   ✅ Found 4 synced blocks
+🔍 Scanning page: 10/30/90 FG (24f72d5a...)
+    📊 Found 67 total blocks (including nested)
+   ✅ Found 4 synced blocks
+🔍 Scanning page: Partner Checking FG  (24f72d5a...)
+    📊 Found 90 total blocks (including nested)
+   ✅ Found 4 synced blocks
+🔍 Scanning page: Translation Dilemmas - Do & Equip FG (24f72d5a...)
+    📊 Found 169 total blocks (including nested)
+   ✅ Found 4 synced blocks
+🔍 Scanning page: Team Checking FG (24f72d5a...)
+    📊 Found 106 total blocks (including nested)
+   ✅ Found 4 synced blocks
+🔍 Scanning page: FIA Oral Drafting: Lite Version FG (24f72d5a...)
+    📊 Found 166 total blocks (including nested)
+   ✅ Found 1 synced blocks
+🔍 Scanning page: Translating Open Bible Stories (25072d5a...)
+    📊 Found 15 total blocks (including nested)
+   ❌ No synced blocks found
+🔍 Scanning page: Translate Open Bible Stories First (25072d5a...)
+    📊 Found 14 total blocks (including nested)
+   ✅ Found 1 synced blocks
+🔍 Scanning page: Discover the Principles of Translation using OBS (25072d5a...)
+    📊 Found 75 total blocks (including nested)
+   ❌ No synced blocks found
+🔍 Scanning page: A Checklist to Publish (25072d5a...)
+    📊 Found 18 total blocks (including nested)
+   ❌ No synced blocks found
+🔍 Scanning page: Integrating Theological Formation - 5M OBS (25072d5a...)
+    📊 Found 93 total blocks (including nested)
+   ✅ Found 1 synced blocks
+🔍 Scanning page: Oral Translation Process for OBS (25072d5a...)
+    📊 Found 36 total blocks (including nested)
+   ❌ No synced blocks found
+🔍 Scanning page: OBS Introduction Activity - Do 🕺 (25072d5a...)
+    📊 Found 25 total blocks (including nested)
+   ❌ No synced blocks found
+🔍 Scanning page: How to Externally Check OBS (25072d5a...)
+    📊 Found 178 total blocks (including nested)
+   ❌ No synced blocks found
+🔍 Scanning page: How to Draft & Internally Check OBS (25072d5a...)
+    📊 Found 282 total blocks (including nested)
+   ❌ No synced blocks found
+🔍 Scanning page: How to Distribute Open Bible Stories (OBS) (25072d5a...)
+    📊 Found 12 total blocks (including nested)
+   ❌ No synced blocks found
+
+📄 Results saved to: synced_blocks_found_20250828_104411.json
+
+⚠️ FOUND 44 SYNCED BLOCKS
+================================================================================
+1. REFERENCE Block  UNSYNCED TRAINING GUIDE HERE
+   Page: Understanding Authorial Intent FG
+   Position: 2/136
+   Block ID: 24f72d5a-f2de-8144-83c8-dba3e8ed00f9
+   Original ID: 1c372d5a-f2de-80d4-9a0a-d46707453554
+   BEFORE: "🪁 Training Guide 👥" 
+   AFTER:  "Facilitator Guide"
+
+2. REFERENCE Block
+   Page: Understanding Authorial Intent FG
+   Position: 20/136
+   Block ID: 24f72d5a-f2de-8174-ab3b-d44437fc980b
+   Original ID: 20872d5a-f2de-80a8-ac1c-fb63d2b533b9
+   BEFORE: "Session Objectives:"
+   AFTER:  "Introduction Activity 👀"
+
+3. REFERENCE Block
+   Page: Understanding Authorial Intent FG
+   Position: 22/136
+   Block ID: 24f72d5a-f2de-81d8-a568-ceb293aaca15
+   Original ID: 20872d5a-f2de-808b-93c9-cc8672905d2a
+   BEFORE: "Session Objectives:"
+   AFTER:  "Introduction Activity 👀"
+
+4. REFERENCE Block
+   Page: Understanding Authorial Intent FG
+   Position: 55/136
+   Block ID: 24f72d5a-f2de-81c1-8107-ddd01746db29
+   Original ID: 1c472d5a-f2de-8008-8acb-c511971d9cd7
+   BEFORE: "Divide the questions in half"
+   AFTER:  "After 30 minutes, discuss what"
+
+5. REFERENCE Block
+   Page: Translation Drafting FG
+   Position: 3/127
+   Block ID: 24f72d5a-f2de-814a-ba63-c3d5639cdf49
+   Original ID: 1c372d5a-f2de-80d4-9a0a-d46707453554
+   BEFORE: "🪁 Training Guide 👥 💬"
+   AFTER:  "Facilitator Guide"
+
+6. REFERENCE Block
+   Page: Translation Drafting FG
+   Position: 18/127
+   Block ID: 24f72d5a-f2de-811e-9c05-e71b9d94ac0d
+   Original ID: 20872d5a-f2de-80f4-84d3-da629b2e3825
+   BEFORE: "Session Goals:"
+   AFTER:  "Introduction to Drafting 👀"
+
+7. REFERENCE Block
+   Page: Testing your Translation with the Community FG
+   Position: 3/176
+   Block ID: 24f72d5a-f2de-81e4-9ad8-e5467249f98d
+   Original ID: 1c372d5a-f2de-80d4-9a0a-d46707453554
+   BEFORE: "🪁 Training Guide 🫂"
+   AFTER:  "Facilitator Guide"
+
+8. REFERENCE Block
+   Page: Testing your Translation with the Community FG
+   Position: 21/176
+   Block ID: 24f72d5a-f2de-81b1-a3ed-d1d71ed564a5
+   Original ID: 20972d5a-f2de-8026-88e3-cad6902c3c03
+   BEFORE: "Session Objectives:"
+   AFTER:  "Introduction Activity 👀"
+
+9. REFERENCE Block
+   Page: Testing your Translation with the Community FG
+   Position: 23/176
+   Block ID: 24f72d5a-f2de-81d2-a109-f774e423956b
+   Original ID: 20972d5a-f2de-8014-868b-ddd2282feb02
+   BEFORE: "Session Objectives:"
+   AFTER:  "Introduction Activity 👀"
+
+10. REFERENCE Block
+   Page: Qualities of Good Bible Translation  FG
+   Position: 13/187
+   Block ID: 24f72d5a-f2de-813c-a2cb-eef1705e9047
+   Original ID: 1c372d5a-f2de-80d4-9a0a-d46707453554
+   BEFORE: "🪁 Training Guide ✝️ 👥"
+   AFTER:  "Facilitator Guide/Lesson Plan"
+
+11. REFERENCE Block
+   Page: Qualities of Good Bible Translation  FG
+   Position: 33/187
+   Block ID: 24f72d5a-f2de-81f4-9429-dfae91d36f2f
+   Original ID: 20972d5a-f2de-80af-bd6d-cf10eb741ae8
+   BEFORE: "1️⃣ Participants will be able"
+   AFTER:  "2️⃣ Participants will be able"
+
+12. REFERENCE Block  UNSYNCED FOUNDATIONS 5 VIDEO BLOCK HERE
+   Page: Qualities of Good Bible Translation  FG
+   Position: 70/187
+   Block ID: 24f72d5a-f2de-81ca-b560-f67bf831cb52
+   Original ID: 21772d5a-f2de-80df-8302-ce75e3640b68
+   BEFORE: "Video" 
+   AFTER:  "Watch:"
+
+13. REFERENCE Block
+   Page: Planning Your Translation Process - FG
+   Position: 3/287
+   Block ID: 24f72d5a-f2de-817d-ac86-c605fbf16164
+   Original ID: 1c372d5a-f2de-80d4-9a0a-d46707453554
+   BEFORE: "🪁 Training Guide 💬"
+   AFTER:  "Facilitator Guide/Lesson Plan"
+
+14. REFERENCE Block
+   Page: Form & Meaning FG
+   Position: 2/235
+   Block ID: 24f72d5a-f2de-8164-95e8-dd3260d4d58b
+   Original ID: 1c372d5a-f2de-80d4-9a0a-d46707453554
+   BEFORE: "🪁 Training Guide 👥 💬"
+   AFTER:  "Church-Centric Bible Translation relies on"
+
+15. REFERENCE Block
+   Page: Form & Meaning FG
+   Position: 5/235
+   Block ID: 23a72d5a-f2de-8028-8e7f-d09ba6b95b2b
+   Original ID: 23a72d5a-f2de-8053-938c-f4e9890d48b9
+   BEFORE: "This training content focuses on"
+   AFTER:  "👀 See: The essential thing"
+
+16. REFERENCE Block
+   Page: Form & Meaning FG
+   Position: 33/235
+   Block ID: 24f72d5a-f2de-81c1-83e6-cd3c87fcfadd
+   Original ID: 20972d5a-f2de-805b-99ce-e4b8aac1f667
+   BEFORE: "Session Objectives:"
+   AFTER:  "1️⃣ Participants will examine the"
+
+17. REFERENCE Block
+   Page: Form & Meaning FG
+   Position: 36/235
+   Block ID: 24f72d5a-f2de-81a1-ac22-cb1d409ddd28
+   Original ID: 20972d5a-f2de-80f0-b3e6-e0086e817f43
+   BEFORE: "1️⃣ Participants will examine the"
+   AFTER:  "2️⃣ Participants will integrate qualities"
+
+18. REFERENCE Block UNSYNCED FOUNDATIONS VIDEO 2 HERE
+   Page: Form & Meaning FG
+   Position: 89/235
+   Block ID: 24f72d5a-f2de-8187-b780-d7adfd49a465
+   Original ID: 22772d5a-f2de-80c1-9f88-ed6fb90a86fd
+   BEFORE: "Display slide 3 after the"
+   AFTER:  "Watch:"
+
+19. REFERENCE Block UNSYNCED MAKING TRANSLATION CHOICES DO HERE
+   Page: Form & Meaning FG
+   Position: 181/235
+   Block ID: 24f72d5a-f2de-81af-96d7-d7bb12bb9851
+   Original ID: 1cf72d5a-f2de-805e-aaa9-f9bd3b33485c
+   BEFORE: "Do not create small groups."
+   AFTER:  "Making Translation Choices: Do 🕺"
+
+20. REFERENCE Block
+   Page: Church Leader Checking FG
+   Position: 3/137
+   Block ID: 24f72d5a-f2de-811d-b734-eb1184b1e3ed
+   Original ID: 1c372d5a-f2de-80d4-9a0a-d46707453554
+   BEFORE: "🪁 Training Guide ✝️ 🍶"
+   AFTER:  "Facilitator Guide"
+
+21. REFERENCE Block
+   Page: Church Leader Checking FG
+   Position: 18/137
+   Block ID: 24f72d5a-f2de-8165-97f7-e9a2f28d69e5
+   Original ID: 20972d5a-f2de-8055-a7a9-c10774ee7f74
+   BEFORE: "Session Objective"
+   AFTER:  "Introduction Activity 👀"
+
+22. REFERENCE Block
+   Page: CCBT Cycle Role Play FG
+   Position: 3/123
+   Block ID: 24f72d5a-f2de-8163-8e7e-d39d1ce0428c
+   Original ID: 1c372d5a-f2de-80d4-9a0a-d46707453554
+   BEFORE: "🪁 Training Guide ✝️👥💬🍶〰️"
+   AFTER:  "Facilitator Guide"
+
+23. REFERENCE Block
+   Page: CCBT Cycle Role Play FG
+   Position: 20/123
+   Block ID: 24f72d5a-f2de-81fe-96e9-d4089ad5bd5a
+   Original ID: 20972d5a-f2de-8002-80e4-f8a690ec93f2
+   BEFORE: "Session Objectives"
+   AFTER:  "Introduction Activity 👀"
+
+24. REFERENCE Block
+   Page: CCBT Cycle Role Play FG
+   Position: 28/123
+   Block ID: 24f72d5a-f2de-811e-83bb-c09d8d6e4562
+   Original ID: 20972d5a-f2de-809f-979f-c8dcb4cb1a1b
+   BEFORE: "Role Play"
+   AFTER:  "Discovery Activity 🕺"
+
+25. REFERENCE Block UNSYNCED FOUNDATIONS VIDEO 3 HERE
+   Page: CCBT Cycle Role Play FG
+   Position: 122/123
+   Block ID: 24f72d5a-f2de-81ef-812d-e2ac8cd3f355
+   Original ID: 22772d5a-f2de-802d-863b-efb89aacc42f
+   BEFORE: "Follow the instructions from the"
+   AFTER:  "N/A"
+
+26. REFERENCE Block
+   Page: 10/30/90 FG
+   Position: 3/67
+   Block ID: 24f72d5a-f2de-8154-9ce4-d37298012910
+   Original ID: 1c372d5a-f2de-80d4-9a0a-d46707453554
+   BEFORE: "🪁 Training Guide ✝️👥💬🍶〰️"
+   AFTER:  "Facilitator Guide"
+
+27. REFERENCE Block
+   Page: 10/30/90 FG
+   Position: 20/67
+   Block ID: 24f72d5a-f2de-819d-be17-db637d8f0364
+   Original ID: 20972d5a-f2de-806e-86e5-c1a2b93ee744
+   BEFORE: "Session Objective"
+   AFTER:  "The No-Plan Challenge👀"
+
+28. REFERENCE Block
+   Page: 10/30/90 FG
+   Position: 28/67
+   Block ID: 24f72d5a-f2de-810e-9046-e851a15e3aa9
+   Original ID: 20972d5a-f2de-8073-972f-f2f43acc29bf
+   BEFORE: "Group work"
+   AFTER:  "Present your Plan 🎓"
+
+29. REFERENCE Block
+   Page: 10/30/90 FG
+   Position: 32/67
+   Block ID: 24f72d5a-f2de-81b6-80f2-f8ae74293882
+   Original ID: 22772d5a-f2de-80aa-a4e3-dc38482cf97f
+   BEFORE: "Presentations"
+   AFTER:  "The No-Plan Challenge (Short Icebreaker)"
+
+30. REFERENCE Block
+   Page: Partner Checking FG
+   Position: 3/90
+   Block ID: 24f72d5a-f2de-8102-8a7b-d83810c7982e
+   Original ID: 1c372d5a-f2de-80d4-9a0a-d46707453554
+   BEFORE: "🪁 Training Guide 💬 🍶"
+   AFTER:  "Facilitator Guide"
+
+31. REFERENCE Block
+   Page: Partner Checking FG
+   Position: 17/90
+   Block ID: 24f72d5a-f2de-8163-8e94-e6291678f6c9
+   Original ID: 20972d5a-f2de-809d-b3bc-ccd96ce99917
+   BEFORE: "Session Objectives:"
+   AFTER:  "Introduction Activity 👀"
+
+32. REFERENCE Block
+   Page: Partner Checking FG
+   Position: 19/90
+   Block ID: 24f72d5a-f2de-8102-8ec7-e4652dbf4e4d
+   Original ID: 20972d5a-f2de-8067-a8e3-fe795ce4ceae
+   BEFORE: "Session Objectives:"
+   AFTER:  "Introduction Activity 👀"
+
+33. REFERENCE Block
+   Page: Partner Checking FG
+   Position: 50/90
+   Block ID: 24f72d5a-f2de-81cd-bdd9-c7f05763d1ac
+   Original ID: 1a672d5a-f2de-805d-90c4-d67154dd55cd
+   BEFORE: "Use a drafting software to"
+   AFTER:  "Form and Meaning"
+
+34. REFERENCE Block
+   Page: Translation Dilemmas - Do & Equip FG
+   Position: 3/169
+   Block ID: 24f72d5a-f2de-812c-b279-c3ef3e9a866f
+   Original ID: 1c372d5a-f2de-80d4-9a0a-d46707453554
+   BEFORE: "🪁 Training Guide 👥 💬"
+   AFTER:  "Facilitator Guide"
+
+35. REFERENCE Block
+   Page: Translation Dilemmas - Do & Equip FG
+   Position: 23/169
+   Block ID: 24f72d5a-f2de-811c-9a3a-f44e91e0777c
+   Original ID: 20972d5a-f2de-8008-b5d9-d7d7b7fa3fa8
+   BEFORE: "Session Objectives:"
+   AFTER:  "Introduction 👀"
+
+36. REFERENCE Block 
+   Page: Translation Dilemmas - Do & Equip FG
+   Position: 28/169
+   Block ID: 24f72d5a-f2de-8128-957c-ff6abf983134
+   Original ID: 20972d5a-f2de-8078-8c66-f32ae46147d9
+   BEFORE: "Review + Discussion"
+   AFTER:  "Case Studies 🕺"
+
+37. REFERENCE Block
+   Page: Translation Dilemmas - Do & Equip FG
+   Position: 40/169
+   Block ID: 24f72d5a-f2de-818f-891d-c71f239b1e62
+   Original ID: 1cf72d5a-f2de-805e-aaa9-f9bd3b33485c
+   BEFORE: "If the trainers have not"
+   AFTER:  "Synthesize"
+
+38. REFERENCE Block
+   Page: Team Checking FG
+   Position: 3/106
+   Block ID: 24f72d5a-f2de-8197-b9fe-d92385bf160f
+   Original ID: 1c372d5a-f2de-80d4-9a0a-d46707453554
+   BEFORE: "🪁 Training Guide 💬 🍶"
+   AFTER:  "Facilitator Guide"
+
+39. REFERENCE Block
+   Page: Team Checking FG
+   Position: 21/106
+   Block ID: 24f72d5a-f2de-8183-b277-d7207ad05f68
+   Original ID: 20972d5a-f2de-8035-aa6f-e59786228d32
+   BEFORE: "Session Objectives:"
+   AFTER:  "Introduction Activity 👀"
+
+40. REFERENCE Block
+   Page: Team Checking FG
+   Position: 23/106
+   Block ID: 24f72d5a-f2de-81b5-8ab7-c3a1d80e3dcb
+   Original ID: 20972d5a-f2de-80f5-b723-f5818fa707c1
+   BEFORE: "Session Objectives:"
+   AFTER:  "Introduction Activity 👀"
+
+41. REFERENCE Block
+   Page: Team Checking FG
+   Position: 69/106
+   Block ID: 24f72d5a-f2de-8155-99fb-d3fb8be7f3b3
+   Original ID: 1a572d5a-f2de-8042-a499-d90825d8c700
+   BEFORE: "Refer to the section in"
+   AFTER:  "translationNotes Check in translationCore"
+
+42. REFERENCE Block
+   Page: FIA Oral Drafting: Lite Version FG
+   Position: 3/166
+   Block ID: 24f72d5a-f2de-8167-9719-f8d0c3920ddc
+   Original ID: 1c372d5a-f2de-80d4-9a0a-d46707453554
+   BEFORE: "🪁 Training Guide"
+   AFTER:  "Facilitator Guide/Lesson Plan"
+
+43. REFERENCE Block
+   Page: Translate Open Bible Stories First
+   Position: 5/14
+   Block ID: 25072d5a-f2de-81ca-b6b9-e44966c4ecf0
+   Original ID: c734d039-394f-409a-b04e-6d5a9a627d06
+   BEFORE: "Available under an open license"
+   AFTER:  "How do you translate OBS?"
+
+44. REFERENCE Block
+   Page: Integrating Theological Formation - 5M OBS
+   Position: 4/93
+   Block ID: 25072d5a-f2de-8126-8384-c00cfa90bf80
+   Original ID: 1c372d5a-f2de-80d4-9a0a-d46707453554
+   BEFORE: "To the right of the"
+   AFTER:  "Facilitator Guide/Lesson Plan"

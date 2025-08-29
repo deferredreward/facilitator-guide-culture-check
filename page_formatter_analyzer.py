@@ -7,11 +7,15 @@ Uses existing cached data to avoid overwriting previous scrapes for before/after
 """
 
 import os
+import sys
 import json
 import argparse
 from pathlib import Path
-from file_finder import find_debug_file_by_page_id_only
 from collections import Counter
+
+# Add utils directory to path for utility imports
+sys.path.append(os.path.join(os.path.dirname(__file__), 'utils'))
+from file_finder import find_debug_file_by_page_id_only
 
 def analyze_page_structure(page_id):
     """

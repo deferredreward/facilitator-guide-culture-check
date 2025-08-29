@@ -15,6 +15,9 @@ from pathlib import Path
 from datetime import datetime
 from dotenv import load_dotenv
 from ai_handler import create_ai_handler
+
+# Add utils directory to path for utility imports
+sys.path.append(os.path.join(os.path.dirname(__file__), 'utils'))
 from markdown_utils import clean_markdown_content
 from file_finder import find_markdown_file_by_page_id
 
@@ -75,59 +78,54 @@ def read_markdown_content(file_path):
         logging.error(f"❌ Error reading markdown file: {e}")
         return None
 
+def load_prompt_from_file(path: str = "prompts.txt", section: str = "Culture") -> str:
+    """
+    Load a prompt from prompts.txt by section name
+    
+    Args:
+        path (str): Path to prompts file
+        section (str): Section name (Reading, Translation, Culture, etc.)
+        
+    Returns:
+        str: The prompt text
+    """
+    try:
+        from pathlib import Path
+        p = Path(path)
+        text = p.read_text(encoding="utf-8")
+        
+        # Find the section
+        start_marker = f"# {section}:"
+        start_idx = text.find(start_marker)
+        if start_idx == -1:
+            raise ValueError(f"Section '{section}' not found in {path}")
+            
+        section_text = text[start_idx:]
+        
+        # Find the first triple quote after the section header
+        q1 = section_text.find('"""')
+        if q1 == -1:
+            raise ValueError(f"No triple-quoted prompt found in section '{section}'")
+            
+        q2 = section_text.find('"""', q1 + 3)
+        if q2 == -1:
+            raise ValueError(f"Unclosed triple-quoted prompt in section '{section}'")
+            
+        return section_text[q1 + 3:q2].strip()
+        
+    except Exception as e:
+        # Fallback to a basic prompt if loading fails
+        print(f"Warning: Failed to load prompt from {path}: {e}")
+        return "You are an expert in cross-cultural communication and educational activity design. Provide detailed cultural analysis for the given content."
+
 def get_cultural_analysis_prompt(content):
     """Create the prompt for cultural activity analysis"""
-    prompt = f"""You are an expert in cross-cultural communication and educational activities. You have deep knowledge of cultural sensitivities, communication styles, and learning preferences across different regions of the world.
-
-Please analyze the following educational content and provide detailed feedback on the cultural appropriateness of the activities described. Focus on identifying where activities would work well and where they might face challenges in different cultural contexts.
-
-ANALYSIS REQUIREMENTS:
-
-1. **Activity Identification**: Identify all activities, exercises, and interactive elements in the content.
-
-2. **Cultural Region Analysis**: For each activity, analyze its suitability for:
-   - East Asia (China, Japan, Korea, etc.)
-   - South Asia (India, Pakistan, Bangladesh, etc.)
-   - Southeast Asia (Thailand, Vietnam, Indonesia, etc.)
-   - Middle East & North Africa
-   - Sub-Saharan Africa (or other regions of Africa with similar cultural contexts)
-   - Latin America & Caribbean
-   - Eastern Europe
-   - Western Europe & North America
-   - Pacific Islands
-   - other unique cultural contexts
-
-3. **Cultural Factors to Consider**:
-   - Communication styles (direct vs. indirect)
-   - Power distance and authority relationships
-   - Individualism vs. collectivism
-   - Gender roles and expectations
-   - Religious and spiritual considerations
-   - Educational traditions and preferences
-   - Physical contact and personal space
-   - Time orientation and scheduling
-   - Group dynamics and social hierarchies
-   - etc
-
-4. **For Each Activity, Provide**:
-   - **Where it would work well** and why
-   - **Where it might face challenges** and specific reasons why
-   - **Alternative activities** for regions where the original might not work well
-   - **Cultural adaptations** that could make it more suitable (outline entire activity with new instructions)
-
-5. **Format Your Response**:
-   Use clear markdown formatting with:
-   - Headers for each activity
-   - Bullet points for regions and feedback
-   - Clear explanations of cultural reasoning
-   - Specific, actionable alternative suggestions
-
-Here's the content to analyze:
-
-{content}
-
-Please provide a comprehensive cultural analysis that would help facilitators understand how to adapt these activities for different cultural contexts."""
-
+    # Load prompt template from prompts.txt
+    prompt_template = load_prompt_from_file("prompts.txt", "Culture")
+    
+    # Replace {content} placeholder with actual content
+    prompt = prompt_template.replace('{content}', content)
+    
     return prompt
 
 def analyze_content_with_ai(content, ai_choice):

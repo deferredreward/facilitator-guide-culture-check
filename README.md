@@ -1,76 +1,209 @@
 # Facilitator Guide Culture Check
 
-A comprehensive, intelligent suite for scraping, analyzing, and **non-destructively** enhancing Notion pages with advanced AI-powered content improvements. Features breakthrough formatting preservation and targeted cultural adaptations.
+An AI-powered system for enhancing Notion-based facilitator training materials with cultural adaptations, accessibility improvements, and evaluation tools. Features advanced JSON+text processing for perfect formatting preservation.
 
 ## 🎉 **RECENT BREAKTHROUGHS**
-- ✅ **Formatting Preservation Revolution**: Maintains Notion's rich text structure during AI enhancement
-- ✅ **Intelligent Block-by-Block Updates**: Real-time AI assistance with structure awareness
-- ✅ **Protected Content Safety**: Bulletproof synced block protection
-- ✅ **Visual Element Preservation**: Emojis, icons, and formatting patterns maintained
-- ✅ **Toggle Content Processing**: Discovers and enhances hidden content in collapsed sections
+- ✅ **SMS & System Notifications**: Get notified when each page completes with progress updates
+- ✅ **Batch Processing**: Process multiple pages automatically with `--file` parameter
+- ✅ **JSON+Text AI Processing**: Revolutionary approach preserving complex Notion formatting
+- ✅ **Synced Block Detection**: Built-in finder and conversion for synced blocks
+- ✅ **Mixed AI Models**: Use different AI providers for different tasks
+
+## Overview
+
+This system provides three core functions for enhancing educational content:
+
+1. **📚 Reading Level Enhancement** - Makes content more accessible to non-native English speakers
+2. **🌍 Cultural Suggestions** - Provides cultural adaptations for training activities  
+3. **❓ Evaluation Questions** - Generates trainer evaluation questions for assessment
 - ✅ **Targeted Cultural Recommendations**: Activity-specific cultural adaptations
 
-## 🎯 Project Overview
+## 🏗️ Architecture
 
-This project provides a complete workflow for working with Notion pages:
+The system is now organized into a clean, modular architecture:
 
-1. **🔍 Intelligent Scraping**: Extract complete Notion page content with structure preservation
-2. **🤖 Advanced AI Analysis**: Block-by-block content enhancement with formatting awareness
-3. **✍️ Non-Destructive Enhancement**: Structure-preserving content improvements with synced block protection
-4. **🎯 Targeted Cultural Adaptations**: Activity-specific cultural recommendations with smart placement
-5. **📊 Comprehensive Analytics**: Dual logging system for program operations and AI interactions
-
-## 🚀 Features
-
-### 📄 Notion Scraping (`notion_scraper.py`) - **ENHANCED SYSTEM**
-- **🔍 Complete page extraction** to markdown with structure preservation
-- **📊 Structured JSON export** with full block hierarchy and debug info
-- **🔄 Recursive block traversal** including nested and toggle content
-- **🎨 Rich text formatting** preservation with annotation support
-- **🧱 Advanced block support**: columns, toggles, callouts, dividers, synced blocks
-- **💾 Intelligent caching** for efficient repeated access and before/after comparison
-
-### 🤖 AI-Powered Analysis
-
-#### Cultural Activity Analyzer (`cultural_activity_analyzer.py`)
-- Analyzes activities for cultural appropriateness
-- Provides region-specific feedback
-- Supports multiple AI models (Claude, Gemini, OpenAI)
-- Generates detailed cultural sensitivity reports
-
-#### Reading Level Enhancer (`ai_reading_enhancer.py`)
-- Improves readability for non-native English speakers
-- Targets 8th-grade reading level
-- Maintains original meaning while simplifying language
-- Multiple AI model support
-
-### ✍️ Notion Writing (`notion_writer.py`)
-- **Non-destructive block modification**
-- **Intelligent block finding** by criteria (emojis, text patterns)
-- **Cached data utilization** for efficiency
-- **Multiple block type support** for updates
-- **Comprehensive error handling**
-
-### 🧪 Testing Framework (`test_notion_word_reversal.py`)
-- **Word reversal testing** for demonstration
-- **Dry-run mode** for safe testing
-- **Interactive cache refresh** options
-- **Comprehensive test coverage**
-- **Command-line interface** with multiple options
-
-## 🚀 **QUICK START - ORCHESTRATOR**
-
-### **Complete AI Enhancement Workflow**
-```bash
-# Run complete workflow: scrape + questions + culture + reading enhancement
-python orchestrator.py <notion_page_url> --ai claude
-
-# Dry run first (recommended)
-python orchestrator.py <notion_page_url> --ai claude --dry-run
-
-# Use different AI models
-python orchestrator.py <page_id> --ai gemini
 ```
+├── orchestrator.py           # Main workflow controller
+├── notion_block_editor.py    # Core JSON+text block editor (NEW)
+├── prompts.txt              # Centralized prompt templates
+├── tests/                   # Test scripts and utilities
+├── utils/                   # Utility modules (file_finder, markdown_utils)
+├── logs/                    # Operation and AI interaction logs
+└── Core Modules:
+    ├── ai_handler.py            # Multi-provider AI interface
+    ├── notion_writer.py         # Notion API writing operations
+    ├── cultural_activity_analyzer.py  # Cultural adaptation analysis
+    ├── ai_question_generator.py # Evaluation question generation
+    ├── ai_reading_enhancer.py   # Reading level improvement
+    ├── ai_translator.py         # Translation capabilities
+    └── notion_scraper.py        # Notion content extraction
+```
+
+## 🎯 Core Functions
+
+The system provides three main functions accessible through the orchestrator:
+
+1. **📚 Reading Level Enhancement**: Block-by-block content simplification for non-native speakers
+2. **🌍 Cultural Suggestions**: Activity-specific cultural adaptations with toggle placement
+3. **❓ Evaluation Questions**: AI-generated trainer assessment questions
+
+## ⚡ Quick Start
+
+### Complete Workflow
+```bash
+# Single page - run all three enhancements
+python orchestrator.py <PAGE_ID> --ai claude
+
+# Batch processing - run multiple pages from file
+python orchestrator.py --file pages.txt --ai claude
+```
+
+### Individual Operations
+```bash
+# Single page operations
+python orchestrator.py <PAGE_ID> --only reading --ai claude
+python orchestrator.py <PAGE_ID> --only culture --ai gemini
+python orchestrator.py <PAGE_ID> --only questions --ai claude
+python orchestrator.py <PAGE_ID> --only translation --target-lang Spanish --ai claude
+
+# Batch operations - NEW!
+python orchestrator.py --file pages.txt --only reading --ai claude
+python orchestrator.py --file pages.txt --only translation --target-lang Indonesian --ai gemini
+python orchestrator.py --file pages.txt --only culture --ai claude --notify-sms
+```
+
+### Advanced Options
+```bash
+# Dry run (no changes)
+python orchestrator.py <PAGE_ID> --dry-run --ai claude
+python orchestrator.py --file pages.txt --dry-run --ai claude
+
+# Limit processing & debug (single page only)
+python orchestrator.py <PAGE_ID> --num-blocks 5 --debug --ai claude
+
+# Custom prompts (single page only)
+python orchestrator.py <PAGE_ID> --prompt-from-file custom.txt --section Reading
+
+# Mixed AI models for different tasks
+python orchestrator.py <PAGE_ID> --reading-ai claude --questions-ai gemini --culture-ai openai
+```
+
+### Direct Block Editor
+```bash
+# Advanced JSON+text processing
+python notion_block_editor.py <PAGE_ID> --ai claude --section Reading --limit 10 --debug
+```
+
+## 🚀 Key Features
+
+### 🎯 JSON+Text AI Processing (`notion_block_editor.py`)
+- **Revolutionary formatting preservation** using Notion's native JSON structure
+- **Recursive block processing** with API inconsistency handling
+- **Multiple AI provider support** (Claude, Gemini, OpenAI, xAI)
+- **Configurable prompt system** with section-based templates
+- **Advanced debugging** and dry-run capabilities
+
+### 🌍 Cultural Analysis (`cultural_activity_analyzer.py`)
+- **Activity-specific cultural guidance** with toggle block placement
+- **Multi-dimensional analysis** (power distance, individualism, etc.)
+- **Region-specific recommendations** for global training programs
+- **Intelligent content insertion** after detected activities
+
+### 📚 Reading Enhancement (`ai_reading_enhancer.py`)
+- **8th-grade level simplification** for non-native speakers
+- **Technical term preservation** with accessible explanations
+- **Active voice preference** and sentence structure improvements
+- **Format-aware processing** maintaining rich text styling
+
+### ❓ Question Generation (`ai_question_generator.py`)
+- **Diagnostic evaluation questions** for trainer assessment
+- **Open-ended scenario-based** questioning approach
+- **Pre/post training application** for knowledge gap identification
+- **Professional language** suitable for diverse learners
+
+## 📁 Batch Processing
+
+### **File Format**
+Create a text file with page IDs (one per line):
+```
+# pages.txt - Comments start with #
+25c72d5af2de80ab803dd0f52d3f286b
+https://www.notion.so/page/Another-Page-123abc456def789...
+Some-File-Name-FG-789def123abc456...
+
+# Empty lines and comments are ignored
+```
+
+### **Batch Commands**
+```bash
+# Process all pages in file
+python orchestrator.py --file pages.txt --ai claude
+
+# Batch dry run (recommended first)
+python orchestrator.py --file pages.txt --dry-run --ai claude
+
+# Mixed AI models for batch processing
+python orchestrator.py --file pages.txt --reading-ai claude --culture-ai gemini
+
+# With SMS notifications (requires email setup)
+python orchestrator.py --file pages.txt --ai claude --notify-sms
+
+# With system notifications (requires: pip install plyer)
+python orchestrator.py --file pages.txt --ai claude --notify-system
+
+# Both notification types
+python orchestrator.py --file pages.txt --ai claude --notify-sms --notify-system
+```
+
+### **Batch Limitations**
+- Force refresh (`--force-refresh`) only works with single pages  
+- Synced block checking (`--unsync-blocks`) only works with single pages
+
+## 🔧 Synced Block Support
+
+The orchestrator includes built-in synced block detection and conversion:
+
+```bash
+# Convert synced blocks during processing (single page only)
+python orchestrator.py <PAGE_ID> --unsync-blocks --ai claude
+
+# Find synced blocks across multiple pages
+python find_synced_blocks.py --file pages.txt
+python find_synced_blocks.py <PAGE_ID>
+```
+
+## 📱 Notification System
+
+Stay informed about batch processing progress with real-time notifications:
+
+### **SMS Notifications**
+Get text messages for each page completion:
+```bash
+python orchestrator.py --file pages.txt --ai claude --notify-sms
+```
+
+**Setup Requirements:**
+- Gmail account with app password
+- Environment variables: `EMAIL_ADDRESS`, `EMAIL_APP_PASSWORD`, `NOTIFY_SMS_TO`
+- SMS format: `phone_number@carrier_gateway.com` (e.g., `1234567890@vtext.com` for Verizon)
+
+**Example SMS Messages:**
+- `FG ✅ (1/5) Form-Meaning Enhancement...` (success)
+- `FG ❌ (2/5) FAILED Another Page...` (failure) 
+- `FG Batch Complete 🎉 5/5 success` (batch complete)
+
+### **System Notifications**
+Get desktop notifications:
+```bash
+pip install plyer
+python orchestrator.py --file pages.txt --ai claude --notify-system
+```
+
+**Features:**
+- Windows toast notifications
+- Cross-platform support via plyer
+- Non-intrusive desktop alerts
+- Progress tracking per page
 
 ### **Individual Component Usage**
 ```bash
@@ -114,6 +247,16 @@ python ai_reading_enhancer.py <page_id> --ai claude
    CLAUDE_API_KEY=your_claude_api_key  # Optional
    GEMINI_API_KEY=your_gemini_api_key  # Optional
    OPENAI_API_KEY=your_openai_api_key  # Optional
+   
+   # For SMS notifications (optional)
+   EMAIL_ADDRESS=your_email@gmail.com
+   EMAIL_APP_PASSWORD=your_app_password
+   NOTIFY_SMS_TO=1234567890@vtext.com  # Your carrier's SMS email gateway
+   ```
+
+5. For system notifications (optional):
+   ```bash
+   pip install plyer
    ```
 
 ## 📚 Usage

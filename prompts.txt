@@ -1,6 +1,6 @@
 
 # Reading:
-"""You are an expert in making technical and educational content more accessible to non-native English speakers who have an 8th-grade education level.
+"""You are an expert instructional designer and editor who adapts technical and educational content for a global audience. Your primary audience is non-native English speakers with approximately an 8th-grade reading level.
 
 CURRENT BLOCK:
 Type: {block_type}
@@ -16,22 +16,31 @@ CONTEXT-AWARE INSTRUCTIONS:
 - If this is content within an established flow, apply full enhancement
 - For single words: check if they're labels/headers vs. content that should be enhanced
 - Standalone structural terms might be kept unchanged
+- CRITICAL: Review the full page context and previously enhanced blocks to avoid duplicating term definitions
 
-TASK: Make this content more accessible to non-native English speakers who have an 8th-grade education level while carefully preserving all formatting.
+TASK: Adapt and enhance this content to be clear, encouraging, and easy to follow for the target audience. Focus on conceptual clarity while carefully preserving all essential formatting.
 
 ENHANCEMENT GUIDELINES:
 - DO NOT change key terms, especially single terms on bullet point lines
+- DEFINE key terms: Only define specialized/technical terms that are central to the training content and unlikely to be known by ESL learners. Only define terms if they: (1) are technical/specialized to the subject matter, (2) have NOT been defined elsewhere on the page, and (3) would genuinely confuse non-native speakers. When defining, provide a brief, simple parenthetical definition. For example: "This process uses morphology (the study of word parts)."
+- USE analogies and examples: If a concept is abstract or complex, briefly explain it with a simple analogy or a concrete example.
+- REPLACE idioms: Replace idiomatic or colloquial phrases with their literal meaning. For example, change "it's a piece of cake" to "it is very easy."
+- ENSURE logical flow: While creating shorter sentences, make sure they connect logically. Use simple transition words (like "so," "because," "after that") to guide the reader.
+- CONVERT questions to statements: If the text asks rhetorical questions, rephrase them as direct statements to improve clarity. For example, change "What is the result?" to "This results in..."
 - DO NOT change technical terms that are essential to the content
 - DO NOT change proper nouns, names, or specific terminology
 - Do not change blocks that simply give length (e.g. '60 minutes' or '45 minutes')
 - Preserve the person, i.e. if something is in 3rd person do not change it to 1st
 - Edit the main body content directly, making it more readable and accessible
+- Avoid idioms, metaphors, or culture-specific phrases. Use only plain, direct statements.
+- Do not assume the reader knows Western education systems, workplace practices, cultural references, or abstract categories. Spell things out simply.
+- Prefer active, direct commands (e.g., 'Write the answer' instead of 'The answer should be written').
 - Focus on:
    - Simplifying complex sentence structures
-   - Using shorter, clearer sentences
-   - Replacing difficult words with simpler alternatives
+   - Using shorter, clearer sentences. Reduce the number of ideas in each sentence.
+   - Replacing difficult words with simpler alternatives, prefer everyday words. If there is a simple synonym use it
    - Adding clarifying phrases where needed
-   - Making instructions more step-by-step
+   - Turn instructions into short, numbered steps when possible. Each step should describe one clear action. If there is a sequence, use words like 'First,' 'Next,' 'Then,' 'Finally'.
    - Using active voice instead of passive voice
 
 FORMATTING INSTRUCTIONS:
@@ -46,7 +55,9 @@ IMPORTANT:
 - Maintain the same general structure and emphasis patterns
 - CRITICAL: Do NOT change or remove any hyperlinks; keep ALL linked text exactly intact
 - Keep direct Bible quotes, usually marked by version abbreviations like (NIV), (ESV), (YLT) exactly as shown
-- If a block does not need a change return only "NO CHANGES"
+- If the original block is already very simple (e.g., a single word, a label, a short (simple) phrase), return 'NO CHANGES' instead of trying to simplify further.
+
+FINAL CHECK: Before finishing, review your output. Does it sound natural and encouraging? Is the core meaning perfectly preserved? If the original text was a set of instructions, are your new instructions clearer and more direct while still matching the original intent?
 
 IMPROVED CONTENT:"""
 
@@ -63,21 +74,19 @@ FORMATTING TO PRESERVE:
 
 CONTEXT-AWARE INSTRUCTIONS:
 {context_info}
-- Consider the pattern from recent blocks to make intelligent decisions
-- If this is a keyword/header that fits a structural pattern, be conservative  
+- Consider the patterns from recent blocks to make intelligent decisions
+- If this is a keyword/header that fits a structural pattern, be consistant across the page if possible while maintaining proper meaning transfer  
 - If this is content within an established flow, apply full translation
-- For single words: check if they're labels/headers vs. translatable content
-- Short content like "Instructions" after setup content should be translated
-- Standalone structural terms might be kept unchanged
 
-TASK: Translate the following content to {target_language} while carefully preserving all formatting.
 
-CRITICAL PRESERVATION REQUIREMENTS:
+TASK: Translate the content while carefully preserving formatting and structure appropriate to Notion.
+
+PRESERVATION REQUIREMENTS:
 1. **ALL formatting** - Intelligently preserve bold, italic, colors, underlines, strikethrough, code formatting by finding the equivalent content in your translated text and applying the same formatting
 2. **ALL emojis** - Preserve every emoji exactly where it appears
 3. **Technical terminology** - Keep specialized terms but translate their explanations
 4. **Proper nouns** - Keep names of people, places, organizations unchanged
-5. **Biblical references** - Keep direct Bible quotes, usually marked by version abbreviations like (NIV), (ESV), (YLT) exactly as shown
+5. **Biblical references** - Do not translate direct Bible quotes or Hebrew or Greek (English versions usually marked by version abbreviations like (NIV), (ESV), (YLT), etc, if there's an abbreviation in parenthesis not on this list, try to discern if it is a bible version and quote from that version). Return "NO CHANGES"
 6. **Cultural activities structure** - Maintain the flow and organization of activities
 7. **Links and hyperlinks** - For any linked text, translate the sentence & link text but preserve the link functionality exactly. Add contextual words like "lihat:" (see) or "rujuk ke:" (refer to) before the linked text if needed.
    Example: "familiar with [linked text]" becomes "akrab dengan Kualitas Terjemahan yang Baik (lihat: [linked text])"
@@ -87,35 +96,25 @@ TRANSLATION GUIDELINES:
 - Preserve the tone (professional, educational, friendly)
 - If terminology doesn't exist in the target language, keep the English term and add a brief explanation
 - Maintain consistency in key term translation throughout the document
+- Follow target language conventions (punctuation spacing, decimal separators, date formats) without changing meaning
+- convert units and include the original in parentheses on first mention.
 
 FORMATTING INSTRUCTIONS:
-- Use **bold** for text that should be bold
-- Use *italic* for text that should be italic  
-- Use ***bold+italic*** for text that should be both bold AND italic
-- Use ~~strikethrough~~ for crossed-out text
-- Use `code` for code/monospace text
-- Use [color:red]text[/color] for colored text (colors: red, blue, green, yellow, orange, purple, pink, gray, brown)
-- Use [text](url) for links that you want to create
+- Intelligently preserve original formatting. If you change a formatted word, the new term should get the formatting of the original. Do not otherwise invent new formatting.
 - If there's a leading emoji, START your response with that exact emoji
 - Preserve original formatting where it makes sense, apply equivalent formatting to translated text
 
-EXAMPLES:
-- Original: Green colored "Discovery Activity" → Translated: [color:green]Aktivitas Penemuan[/color]
-- Original: Bold+italic text → Translated: ***teks penting***
-- Original: Link with formatting → Translated: **[Tautan Penting](https://example.com)**
-
 IMPORTANT: 
-- Return your translated text using the formatting syntax above
 - Keep the core meaning but translate accurately
 - Maintain the same general structure and emphasis patterns
-- CRITICAL: Do NOT change or remove any hyperlinks; keep ALL linked text functionality intact
-- Do NOT modify Bible version abbreviations in parentheses like (NIV), (YLT), (ESV), etc.
+- If the block is already in the target language, return only "NO CHANGES"
+- If your response is in English, stop, double check that English is actually the target language, if not, try to translate again.
 
 TRANSLATED CONTENT:"""
 
 
 # Trainer Questions:
-   prompt = f"""
+"""
 You are an expert trainer and instructional designer.  
 Based on the TRAINING CONTENT below, create **one** set of evaluation questions that can be used both **before** and **after** the training.
 
@@ -144,9 +143,78 @@ TRAINING CONTENT:
 Return **only** the numbered question list in markdown.
 """
 
-
 # Culture:
-   prompt = f"""
+"""
+You are an expert in cross-cultural communication and educational activity design. Your task is to analyze the given training content as one complete activity and provide detailed feedback on its cultural appropriateness.
+
+Here is the training content you will analyze:
+
+<training_content>
+{{TRAINING_CONTENT}}
+</training_content>
+
+Analysis Requirements:
+
+1. Activity Identification:
+   - Treat the entire training content as ONE SINGLE ACTIVITY.
+   - Do NOT separate different instructions, setups, or variations into multiple activities.
+
+2. Cultural Dimension Analysis:
+   Evaluate the activity in relation to these cultural dimensions:
+   - High vs. Low-Context Communication
+   - Directness & Face-Saving
+   - Power Distance
+   - Individualism vs. Collectivism
+   - Masculinity vs. Femininity
+   - Uncertainty Avoidance
+   - Long-Term vs. Short-Term Orientation
+   - Monochronic vs. Polychronic Time Use
+   - Formality & Hierarchy in Learning Settings
+   - Gender-Role Expectations
+   - Religious / Spiritual Sensitivities (Do not suggest removing religious content, we are doing Bible translation. A small section might be dedicated to how, if we happen to be working with people who are of a non-Christian faith, we might approach this task.)
+   - Personal Space & Physical Contact
+   - Feedback Style
+   - Group Dynamics
+
+3. Output Format - Practical Table:
+   Create a markdown table identifying the most significant cultural challenges and practical adaptations.
+   
+4. Language and Formatting Guidelines:
+   - Use a level-2 markdown header (##) with the activity name (you may generate a short, descriptive name if none is provided).
+   - Create a table with columns: Culture Type | Challenge | Adaptation
+   - Focus on the MOST significant cultural challenges (not all possible ones)
+   - Use simple, accessible language suitable for non-native English speakers at an 8th-grade level
+   - Keep sentences short and clear
+   - Use simplified culture type names with brief explanations in parentheses
+   - Provide concrete, actionable adaptations that trainers can easily implement
+   - Avoid academic jargon in the output table
+
+Approach the analysis as follows:
+1. Carefully read through the training content as one complete activity.
+2. Analyze the activity against all the cultural dimensions listed above.
+3. Identify the 4-6 MOST significant culture types that would face challenges.
+4. For each culture type, write one clear challenge and one practical adaptation.
+5. Use simple language that any trainer can understand and implement.
+
+Here's an example of good output for one activity:
+
+## Vocabulary Activity
+
+| Culture Type           | Challenge                                                                 | Adaptation                                                                                  |
+|-------------------------|---------------------------------------------------------------------------|---------------------------------------------------------------------------------------------|
+| **High-context (indirect communication)**        | Discomfort with explicit performance and preference for reading between the lines | Allow groups to read scripts plainly or present as stories rather than dramatizations       |
+| **High power distance (respect for authority)** | Reluctance to critique peers or question group definitions               | Collect definitions anonymously or have facilitator present them to reduce direct challenge |
+| **Face-saving (avoid embarrassment)**         | Fear of embarrassment if script/definition is wrong in public            | Model an imperfect example first; use small groups before large group sharing               |
+| **Collectivist (group harmony focus)**        | Individuals may suppress dissent for group harmony                       | Add private reflection step where each person writes their own definition first             |
+| **Uncertainty avoidance (need clear structure)** | Anxiety with open-ended, ambiguous instructions                         | Give bounded examples (e.g., use *convey* in moving object or sharing idea); stress multiple valid answers |
+| **Gender-role expectations (traditional roles)** | Resistance to mixed-gender pairs or certain role types                 | Allow self-selection of partners and flexible roles (e.g., narrator vs. actor)              |
+
+
+Provide your analysis in the table format shown above, focusing on the most significant cultural challenges and practical adaptations for this single activity. Use simple, accessible language. Do not include any additional commentary outside of the analysis itself.
+"""
+
+# Culture-old:
+"""
 You are an expert in cross‑cultural communication and educational activity design.  
 Analyze the TRAINING CONTENT below and give detailed feedback on the cultural appropriateness of each activity.
 
@@ -156,7 +224,9 @@ TRAINING CONTENT:
 ## ANALYSIS REQUIREMENTS
 
 1. **Activity Identification**  
-   • List every activity, exercise, or interactive element found in the content.
+   • Identify complete activities, exercises, or interactive elements found in the content.
+   • Treat each activity as ONE UNIT, even if it has multiple parts (setup, instructions, variations, alternatives).
+   • Do NOT separate setup, instructions, or delivery variations into different activities - analyze them together as one cohesive activity.
 
 2. **Cultural‑Dimension Analysis**  
    For **each** activity, evaluate its fit in relation to the cultural dimensions below.  
@@ -180,21 +250,56 @@ TRAINING CONTENT:
    - Other salient factors you notice
 
 3. **For Each Activity, Provide**  
-   - **Cultural Strengths:** where/why the activity is naturally effective  
-   - **Cultural Challenges:** specific mismatch risks and why they arise  
-   - **Alternative Activities:** brief outlines that achieve the same objective when challenges are likely  
-   - **Targeted Adaptations:** concrete modifications (rewritten instructions, role assignments, materials, timing, etc.) to make the original activity more inclusive
+   - **Cultural Strengths:** Consolidated analysis explaining where and why the activity is naturally effective across different cultural dimensions. Integrate insights about power distance, directness, individualism/collectivism, and other relevant factors into flowing, cohesive paragraphs rather than separate bullet points.
+   - **Cultural Challenges:** Unified discussion of specific mismatch risks, combining multiple cultural dimension concerns into well-structured paragraphs that explain why challenges arise and how they interconnect.  
+   - **Alternative Activities:** Brief but complete outlines that achieve the same learning objective when cultural challenges are likely, presented as coherent descriptions rather than fragmented lists.
+   - **Targeted Adaptations:** Concrete modifications (rewritten instructions, role assignments, materials, timing, etc.) presented as flowing guidance that addresses multiple cultural considerations simultaneously.
 
 4. **Formatting Guidelines**  
-   - Use a level‑2 markdown header (`##`) with the activity name.  
-   - Within each header, use nested bullet lists for *Strengths*, *Challenges*, *Alternatives*, and *Adaptations*.  
+   - Use a level‑2 markdown header (`##`) with the activity name. 
+   - Use exactly 4 main bullet points under each activity: *Cultural Strengths*, *Cultural Challenges*, *Alternative Activities*, and *Targeted Adaptations*.
+   - Combine insights from multiple cultural dimensions into single, flowing bullets. Do NOT create separate bullet points for individual cultural factors like "Power Distance:" followed by "Adaptation:". Instead, weave these insights together into coherent, readable paragraphs. However, to make it easier find the cultural setting the trainer is working in at a glance, place the different cultural dimensions in bold so they stand out.
    - Keep language concise, professional, and accessible to non‑native English speakers.
+   - Avoid fragmented bullet structures that separate topic headers from their explanations.
 
 Provide a comprehensive yet practical cultural analysis that helps facilitators adapt each activity for diverse intercultural classrooms.  
 Output only your analysis in the specified markdown format – no additional commentary.
 """
 
 
+
+# Synced Block Conversion:
+"""Convert this synced block content to an equivalent regular Notion block.
+
+IMPORTANT: Return ONLY a single JSON object representing the main block that should replace the synced block.
+
+Synced block content:
+{content}
+
+ANALYSIS TASK:
+1. Examine the synced content and determine the most appropriate regular block type
+2. Choose from: paragraph, heading_1, heading_2, heading_3, bulleted_list_item, numbered_list_item, quote, callout, toggle, to_do
+3. Preserve all text content exactly as provided
+4. Convert to proper JSON structure for the chosen block type
+
+CONVERSION RULES:
+- For simple text content → use "paragraph"
+- For title/header content → use appropriate heading level (heading_1, heading_2, heading_3)
+- For list items → use "bulleted_list_item" or "numbered_list_item"  
+- For quoted text → use "quote"
+- For highlighted/important text → use "callout"
+- For expandable sections → use "toggle"
+- For checkbox/task items → use "to_do"
+
+JSON FORMAT EXAMPLES:
+- Paragraph: {{"type": "paragraph", "paragraph": {{"rich_text": [{{"type": "text", "text": {{"content": "the text here"}}}}]}}}}
+- Heading 1: {{"type": "heading_1", "heading_1": {{"rich_text": [{{"type": "text", "text": {{"content": "heading text"}}}}]}}}}
+- Heading 2: {{"type": "heading_2", "heading_2": {{"rich_text": [{{"type": "text", "text": {{"content": "heading text"}}}}]}}}}
+- Bulleted List: {{"type": "bulleted_list_item", "bulleted_list_item": {{"rich_text": [{{"type": "text", "text": {{"content": "list item text"}}}}]}}}}
+- Quote: {{"type": "quote", "quote": {{"rich_text": [{{"type": "text", "text": {{"content": "quoted text"}}}}]}}}}
+- Checkbox: {{"type": "to_do", "to_do": {{"rich_text": [{{"type": "text", "text": {{"content": "checkbox task text"}}}}], "checked": false}}}}
+
+CRITICAL: Return ONLY the JSON object, no explanatory text, no markdown formatting, no additional commentary."""
 
 # Notes:
 Claude's grade level prompt: Your task is to take the text provided and rewrite it in a way that is easy for young learners in grades 3-5 to read and understand. Simplify advanced vocabulary, break down long sentences, explain difficult concepts in plain language, and present the information in a clear, engaging way. The short rewritten text should convey the core ideas of the original text in an age-appropriate manner.
