@@ -1,0 +1,334 @@
+{
+  "block_metadata": {
+    "object": "block",
+    "id": "1c372d5a-f2de-80d4-9a0a-d46707453554",
+    "parent": {
+      "type": "block_id",
+      "block_id": "1a872d5a-f2de-8066-b55d-c6f9f60cf08d"
+    },
+    "created_time": "2025-03-27T15:49:00.000Z",
+    "last_edited_time": "2025-08-27T21:08:00.000Z",
+    "created_by": {
+      "object": "user",
+      "id": "6f4b0d30-cb91-4f34-9e5d-2bd38dab28be"
+    },
+    "last_edited_by": {
+      "object": "user",
+      "id": "e4ca79c9-b6dc-4549-bc2b-6cb96e6c853c"
+    },
+    "has_children": true,
+    "archived": false,
+    "in_trash": false,
+    "type": "synced_block",
+    "synced_block": {
+      "synced_from": null
+    },
+    "request_id": "c8f64b59-f0eb-4bcd-84e8-0ea50404c3f4"
+  },
+  "direct_children": [
+    {
+      "object": "block",
+      "id": "1a872d5a-f2de-80d5-a277-c4a1e77380b8",
+      "parent": {
+        "type": "block_id",
+        "block_id": "1c372d5a-f2de-80d4-9a0a-d46707453554"
+      },
+      "created_time": "2025-02-28T17:16:00.000Z",
+      "last_edited_time": "2025-08-27T21:08:00.000Z",
+      "created_by": {
+        "object": "user",
+        "id": "6f4b0d30-cb91-4f34-9e5d-2bd38dab28be"
+      },
+      "last_edited_by": {
+        "object": "user",
+        "id": "e4ca79c9-b6dc-4549-bc2b-6cb96e6c853c"
+      },
+      "has_children": false,
+      "archived": false,
+      "in_trash": false,
+      "type": "paragraph",
+      "paragraph": {
+        "rich_text": [
+          {
+            "type": "text",
+            "text": {
+              "content": "Church-Centric Bible Translation relies on ",
+              "link": null
+            },
+            "annotations": {
+              "bold": false,
+              "italic": false,
+              "strikethrough": false,
+              "underline": false,
+              "code": false,
+              "color": "default"
+            },
+            "plain_text": "Church-Centric Bible Translation relies on ",
+            "href": null
+          },
+          {
+            "type": "text",
+            "text": {
+              "content": "the capacity of people",
+              "link": null
+            },
+            "annotations": {
+              "bold": true,
+              "italic": false,
+              "strikethrough": false,
+              "underline": false,
+              "code": false,
+              "color": "default"
+            },
+            "plain_text": "the capacity of people",
+            "href": null
+          },
+          {
+            "type": "text",
+            "text": {
+              "content": " for success. ",
+              "link": null
+            },
+            "annotations": {
+              "bold": false,
+              "italic": false,
+              "strikethrough": false,
+              "underline": false,
+              "code": false,
+              "color": "default"
+            },
+            "plain_text": " for success. ",
+            "href": null
+          },
+          {
+            "type": "text",
+            "text": {
+              "content": "People of the Church visualize, plan, execute, draft, check, minister, share, use, validate, publish, and distribute Bible translations for ministry. ",
+              "link": null
+            },
+            "annotations": {
+              "bold": false,
+              "italic": false,
+              "strikethrough": false,
+              "underline": false,
+              "code": false,
+              "color": "default"
+            },
+            "plain_text": "People of the Church visualize, plan, execute, draft, check, minister, share, use, validate, publish, and distribute Bible translations for ministry. ",
+            "href": null
+          }
+        ],
+        "color": "default"
+      }
+    },
+    {
+      "object": "block",
+      "id": "1a872d5a-f2de-809b-bc09-f5e1e8986f51",
+      "parent": {
+        "type": "block_id",
+        "block_id": "1c372d5a-f2de-80d4-9a0a-d46707453554"
+      },
+      "created_time": "2025-02-28T17:22:00.000Z",
+      "last_edited_time": "2025-07-24T00:27:00.000Z",
+      "created_by": {
+        "object": "user",
+        "id": "6f4b0d30-cb91-4f34-9e5d-2bd38dab28be"
+      },
+      "last_edited_by": {
+        "object": "user",
+        "id": "80c062e4-0d62-49d0-9a12-c1515b599786"
+      },
+      "has_children": false,
+      "archived": false,
+      "in_trash": false,
+      "type": "paragraph",
+      "paragraph": {
+        "rich_text": [
+          {
+            "type": "text",
+            "text": {
+              "content": "This training content focuses on ",
+              "link": null
+            },
+            "annotations": {
+              "bold": false,
+              "italic": false,
+              "strikethrough": false,
+              "underline": false,
+              "code": false,
+              "color": "default"
+            },
+            "plain_text": "This training content focuses on ",
+            "href": null
+          },
+          {
+            "type": "text",
+            "text": {
+              "content": "increasing the capacity of the people ",
+              "link": null
+            },
+            "annotations": {
+              "bold": true,
+              "italic": false,
+              "strikethrough": false,
+              "underline": false,
+              "code": false,
+              "color": "default"
+            },
+            "plain_text": "increasing the capacity of the people ",
+            "href": null
+          },
+          {
+            "type": "text",
+            "text": {
+              "content": "in",
+              "link": null
+            },
+            "annotations": {
+              "bold": false,
+              "italic": false,
+              "strikethrough": false,
+              "underline": false,
+              "code": false,
+              "color": "default"
+            },
+            "plain_text": "in",
+            "href": null
+          },
+          {
+            "type": "text",
+            "text": {
+              "content": " ",
+              "link": null
+            },
+            "annotations": {
+              "bold": true,
+              "italic": false,
+              "strikethrough": false,
+              "underline": false,
+              "code": false,
+              "color": "default"
+            },
+            "plain_text": " ",
+            "href": null
+          },
+          {
+            "type": "text",
+            "text": {
+              "content": "the Church. We use a scaffolded approach in our training to grow and develop people\u2019s ability to train and apply principles of Bible translation. Ideally, we reinforce each concept by training it multiple times and each time the trainer goes a little deeper. It typically takes 3 or more training sessions to teach a concept fully and apply it. Trainers may find it helpful to focus on \"See\" activities in their first training and then progress to \"Do\" and \"Equip\" activities in later trainings. Training resources are divided into these three levels and always represented by the same images. Watch the video below for more information.",
+              "link": null
+            },
+            "annotations": {
+              "bold": false,
+              "italic": false,
+              "strikethrough": false,
+              "underline": false,
+              "code": false,
+              "color": "default"
+            },
+            "plain_text": "the Church. We use a scaffolded approach in our training to grow and develop people\u2019s ability to train and apply principles of Bible translation. Ideally, we reinforce each concept by training it multiple times and each time the trainer goes a little deeper. It typically takes 3 or more training sessions to teach a concept fully and apply it. Trainers may find it helpful to focus on \"See\" activities in their first training and then progress to \"Do\" and \"Equip\" activities in later trainings. Training resources are divided into these three levels and always represented by the same images. Watch the video below for more information.",
+            "href": null
+          }
+        ],
+        "color": "default"
+      }
+    },
+    {
+      "object": "block",
+      "id": "23a72d5a-f2de-8028-8e7f-d09ba6b95b2b",
+      "parent": {
+        "type": "block_id",
+        "block_id": "1c372d5a-f2de-80d4-9a0a-d46707453554"
+      },
+      "created_time": "2025-07-24T00:28:00.000Z",
+      "last_edited_time": "2025-07-24T00:28:00.000Z",
+      "created_by": {
+        "object": "user",
+        "id": "80c062e4-0d62-49d0-9a12-c1515b599786"
+      },
+      "last_edited_by": {
+        "object": "user",
+        "id": "80c062e4-0d62-49d0-9a12-c1515b599786"
+      },
+      "has_children": false,
+      "archived": false,
+      "in_trash": false,
+      "type": "synced_block",
+      "synced_block": {
+        "synced_from": {
+          "type": "block_id",
+          "block_id": "23a72d5a-f2de-8053-938c-f4e9890d48b9"
+        }
+      }
+    },
+    {
+      "object": "block",
+      "id": "1a872d5a-f2de-80cb-bbad-e68ecc5442d8",
+      "parent": {
+        "type": "block_id",
+        "block_id": "1c372d5a-f2de-80d4-9a0a-d46707453554"
+      },
+      "created_time": "2025-02-28T17:27:00.000Z",
+      "last_edited_time": "2025-04-03T20:38:00.000Z",
+      "created_by": {
+        "object": "user",
+        "id": "6f4b0d30-cb91-4f34-9e5d-2bd38dab28be"
+      },
+      "last_edited_by": {
+        "object": "user",
+        "id": "80c062e4-0d62-49d0-9a12-c1515b599786"
+      },
+      "has_children": true,
+      "archived": false,
+      "in_trash": false,
+      "type": "column_list",
+      "column_list": {}
+    },
+    {
+      "object": "block",
+      "id": "1a872d5a-f2de-805b-ba75-d5906f2ada1d",
+      "parent": {
+        "type": "block_id",
+        "block_id": "1c372d5a-f2de-80d4-9a0a-d46707453554"
+      },
+      "created_time": "2025-02-28T17:33:00.000Z",
+      "last_edited_time": "2025-04-03T20:38:00.000Z",
+      "created_by": {
+        "object": "user",
+        "id": "6f4b0d30-cb91-4f34-9e5d-2bd38dab28be"
+      },
+      "last_edited_by": {
+        "object": "user",
+        "id": "80c062e4-0d62-49d0-9a12-c1515b599786"
+      },
+      "has_children": false,
+      "archived": false,
+      "in_trash": false,
+      "type": "callout",
+      "callout": {
+        "rich_text": [
+          {
+            "type": "text",
+            "text": {
+              "content": "\u261d\ufe0f Trainers determine which level of training their participants need and conduct the activities below that correspond to the level. Matching icons are used to label the levels of the content.",
+              "link": null
+            },
+            "annotations": {
+              "bold": false,
+              "italic": false,
+              "strikethrough": false,
+              "underline": false,
+              "code": false,
+              "color": "default"
+            },
+            "plain_text": "\u261d\ufe0f Trainers determine which level of training their participants need and conduct the activities below that correspond to the level. Matching icons are used to label the levels of the content.",
+            "href": null
+          }
+        ],
+        "icon": null,
+        "color": "purple_background"
+      }
+    }
+  ],
+  "original_children": null
+}

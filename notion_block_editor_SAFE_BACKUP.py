@@ -300,7 +300,7 @@ def extract_plain_text_from_block(block_data):
     block_type = block_data.get('type', '')
     
     if block_type in ['paragraph', 'heading_1', 'heading_2', 'heading_3', 
-                     'bulleted_list_item', 'numbered_list_item', 'quote', 'callout', 'toggle', 'to_do']:
+                     'bulleted_list_item', 'numbered_list_item', 'quote', 'callout', 'toggle']:
         rich_text = block_data.get(block_type, {}).get('rich_text', [])
         return ''.join([rt.get('text', {}).get('content', '') for rt in rich_text])
     elif block_type == 'image':
@@ -339,7 +339,7 @@ def should_process_block(block_data):
     processable_types = [
         'paragraph', 'heading_1', 'heading_2', 'heading_3',
         'bulleted_list_item', 'numbered_list_item', 'quote', 'callout', 'image',
-        'toggle', 'table_row', 'embed', 'to_do'
+        'toggle', 'table_row', 'embed'
     ]
     
     if block_type not in processable_types:
@@ -392,11 +392,6 @@ def create_json_enhancement_prompt(block_data, plain_text, prompt_file="prompts.
         base_prompt = base_prompt.replace(
             "Translate the content while carefully preserving",
             f"Translate the content to {target_language} while carefully preserving"
-        )
-        # Also enhance the final instruction to emphasize target language
-        base_prompt = base_prompt.replace(
-            "If your response is in English, stop, double check that English is actually the target language, if not, try to translate again.",
-            f"If your response is in English and the target language is not English, you must translate to {target_language}. Double-check that your output is in {target_language}."
         )
     
     # Adapt the prompts.txt format for JSON block processing
@@ -687,19 +682,6 @@ def update_block_in_notion(client, block_id, updated_block_data, dry_run=True):
             print(f"    UPDATED image caption {block_id}")
             return True
             
-        elif block_type == 'to_do':
-            # Handle to_do blocks with both rich_text and checked properties
-            rich_text = updated_block_data.get('to_do', {}).get('rich_text', [])
-            checked = updated_block_data.get('to_do', {}).get('checked', False)
-            
-            client.blocks.update(
-                block_id=block_id,
-                to_do={'rich_text': rich_text, 'checked': checked}
-            )
-            
-            print(f"    UPDATED to_do block {block_id}")
-            return True
-            
         elif block_type == 'table_row':
             # Update table row cells
             cells = updated_block_data.get('table_row', {}).get('cells', [])
@@ -731,232 +713,6 @@ def update_block_in_notion(client, block_id, updated_block_data, dry_run=True):
     except Exception as e:
         print(f"    UPDATE FAILED: {e}")
         return False
-
-def prepare_blocks_for_insertion(blocks):
-    """
-    Convert extracted blocks to simple format suitable for insertion and AI processing
-    
-    Args:
-        blocks: List of block objects from Notion API (flattened from recursive extraction)
-        
-    Returns:
-        list: Simple blocks ready for insertion, flattened to avoid API complexity
-    """
-    print(f"    🔧 Converting {len(blocks)} blocks to simple format for AI processing")
-    
-    insertable_blocks = []
-    
-    for block in blocks:
-        block_type = block.get('type')
-        if not block_type:
-            continue
-        
-        # Convert complex blocks to simple formats
-        simple_block = convert_to_simple_block(block)
-        if simple_block:
-            insertable_blocks.append(simple_block)
-    
-    print(f"    ✅ Prepared {len(insertable_blocks)} simple blocks for insertion")
-    return insertable_blocks
-
-def convert_to_simple_block(block):
-    """
-    Convert any block type to a simple format that's easy to insert and process with AI
-    
-    Args:
-        block: Original block from Notion API
-        
-    Returns:
-        dict: Simple block structure (paragraph, heading, list, etc.)
-    """
-    block_type = block.get('type')
-    
-    # Handle nested synced blocks - process them recursively
-    if block_type == 'synced_block':
-        print(f"    🔄 Processing nested synced block")
-        synced_data = block.get('synced_block', {})
-        synced_from = synced_data.get('synced_from')
-        
-        if synced_from:
-            # This is a reference - try to get content from original
-            original_id = synced_from.get('block_id')
-            print(f"        📍 Nested synced block references: {original_id}")
-            return {
-                'type': 'paragraph',
-                'paragraph': {
-                    'rich_text': [{
-                        'type': 'text',
-                        'text': {'content': f'🔄 Nested synced content (original: {original_id}) - needs recursive processing'}
-                    }]
-                }
-            }
-        else:
-            # This is an original synced block - convert placeholder
-            return {
-                'type': 'paragraph',
-                'paragraph': {
-                    'rich_text': [{
-                        'type': 'text',
-                        'text': {'content': '🔄 Original synced content - needs processing'}
-                    }]
-                }
-            }
-    
-    # Convert column_list to divider for layout separation
-    elif block_type == 'column_list':
-        print(f"    📋 Converting column_list to divider")
-        return {
-            'type': 'divider',
-            'divider': {}
-        }
-    
-    # Skip empty column containers - the content is in paragraphs between them
-    elif block_type == 'column':
-        print(f"    ⏭️ Skipping empty column container (content is in separate paragraphs)")
-        return None  # Skip empty columns
-    
-    # Convert video to paragraph with link
-    elif block_type == 'video':
-        print(f"    🎥 Converting video to paragraph with link")
-        video_data = block.get('video', {})
-        url = ''
-        if 'external' in video_data and video_data['external']:
-            url = video_data['external'].get('url', '')
-        elif 'file' in video_data and video_data['file']:
-            url = video_data['file'].get('url', '')
-        
-        # Debug: show what video data we found
-        print(f"        Video data keys: {list(video_data.keys())}")
-        print(f"        Extracted URL: {url}")
-        
-        if url:
-            content = f"🎥 Training Video: {url}"
-        else:
-            content = "🎥 Training Video (embedded content - URL not accessible)"
-            
-        return {
-            'type': 'paragraph',
-            'paragraph': {
-                'rich_text': [{
-                    'type': 'text',
-                    'text': {'content': content}
-                }]
-            }
-        }
-    
-    # Convert table to bulleted list
-    elif block_type == 'table':
-        print(f"    📊 Converting table to bulleted list placeholder")
-        return {
-            'type': 'bulleted_list_item',
-            'bulleted_list_item': {
-                'rich_text': [{
-                    'type': 'text',
-                    'text': {'content': '📊 Table content (converted from table structure)'}
-                }]
-            }
-        }
-    
-    # Convert embed to paragraph with link
-    elif block_type == 'embed':
-        print(f"    🔗 Converting embed to paragraph")
-        embed_data = block.get('embed', {})
-        url = embed_data.get('url', '')
-        content = f"🔗 Embed: {url}" if url else "🔗 Embedded content"
-        return {
-            'type': 'paragraph',
-            'paragraph': {
-                'rich_text': [{
-                    'type': 'text',
-                    'text': {'content': content}
-                }]
-            }
-        }
-    
-    # For simple blocks, enhance formatting if they contain See/Do/Equip content
-    else:
-        # Check if this is a See/Do/Equip paragraph that should be enhanced
-        text_content = extract_plain_text_from_block(block)
-        
-        if block_type == 'paragraph' and text_content:
-            # Convert See/Do/Equip items to callouts for better visual appeal
-            if any(marker in text_content for marker in ['👀 **See:**', '🕺 **Do:**', '🎓 **Equip:**']):
-                print(f"    🎨 Converting See/Do/Equip paragraph to callout")
-                return {
-                    'type': 'callout',
-                    'callout': {
-                        'rich_text': block.get(block_type, {}).get('rich_text', []),
-                        'icon': {'emoji': '💡'}  # Add a lightbulb icon
-                    }
-                }
-        
-        print(f"    ✨ Preserving {block_type} block with cleanup")
-        clean_block = {'type': block_type}
-        
-        # Copy type-specific data with cleanup
-        if block_type in block:
-            type_data = dict(block[block_type])
-            
-            # Remove problematic fields
-            fields_to_remove = ['color']
-            for field in fields_to_remove:
-                type_data.pop(field, None)
-            
-            # Fix specific issues
-            if block_type == 'callout' and 'icon' in type_data and type_data['icon'] is None:
-                type_data.pop('icon', None)
-            
-            # Remove null values
-            cleaned_data = {k: v for k, v in type_data.items() if v is not None}
-            clean_block[block_type] = cleaned_data
-        
-        return clean_block
-
-def extract_text_from_complex_block(block):
-    """
-    Extract text from complex blocks that may have nested content
-    
-    Args:
-        block: Block data from Notion API
-        
-    Returns:
-        str: Extracted text content
-    """
-    # First try the standard extraction
-    text = extract_plain_text_from_block(block)
-    if text and text.strip():
-        return text.strip()
-    
-    # For complex blocks, we need to look at the structure more carefully
-    block_type = block.get('type')
-    
-    # Debug: show block structure
-    print(f"        Complex block structure for {block_type}:")
-    if block_type in block:
-        type_data = block[block_type]
-        print(f"            Keys: {list(type_data.keys())}")
-        
-        # Look for rich_text in type data
-        if 'rich_text' in type_data:
-            rich_text = type_data['rich_text']
-            if rich_text:
-                text_parts = []
-                for rt in rich_text:
-                    if isinstance(rt, dict) and 'text' in rt and 'content' in rt['text']:
-                        text_parts.append(rt['text']['content'])
-                if text_parts:
-                    result = ' '.join(text_parts).strip()
-                    print(f"            Found rich_text: {result[:50]}...")
-                    return result
-        
-        # Look for any text-like fields
-        for key, value in type_data.items():
-            if isinstance(value, str) and value.strip():
-                print(f"            Found text in {key}: {value[:50]}...")
-                return value.strip()
-    
-    # If still no text, return a descriptive placeholder
-    return f"[{block_type} block - structure: {list(block.get(block_type, {}).keys()) if block_type in block else 'no data'}]"
 
 def convert_synced_block_to_regular(synced_block, ai_handler, notion_client, dry_run=False, dry_dry_run=False, original_context="", enhanced_context=""):
     """
@@ -999,14 +755,10 @@ def convert_synced_block_to_regular(synced_block, ai_handler, notion_client, dry
         else:
             print(f"    📋 Original synced block, extracting content directly")
         
-        # Get content from appropriate source with full recursive structure
+        # Get content from appropriate source
         try:
-            # Use existing recursive extraction from notion_writer
-            from notion_writer import NotionWriter
-            temp_writer = NotionWriter()
-            temp_writer.client = notion_client
-            content_blocks = temp_writer._extract_block_children_recursively(content_source_id)
-            print(f"    📦 Extracted {len(content_blocks)} blocks recursively from synced source")
+            response = notion_client.blocks.children.list(content_source_id)
+            content_blocks = response.get('results', [])
         except Exception as content_error:
             if "Could not find block" in str(content_error) or "404" in str(content_error):
                 print(f"    🚫 Original block no longer exists (orphaned reference)")
@@ -1020,149 +772,108 @@ def convert_synced_block_to_regular(synced_block, ai_handler, notion_client, dry
         
         if not content_blocks:
             print(f"    ⚠️ Synced block appears to be empty")
-            return None  # Let the caller handle deletion
+            # Convert empty synced block to empty paragraph
+            empty_paragraph = {
+                "type": "paragraph",
+                "paragraph": {
+                    "rich_text": []
+                }
+            }
+            
+            if not dry_run:
+                # Replace synced block with empty paragraph
+                notion_client.blocks.update(block_id, empty_paragraph)
+                print(f"    ✅ Converted empty synced block to empty paragraph")
+            
+            return empty_paragraph
         
-        print(f"    🔄 Converting {len(content_blocks)} extracted blocks to insertable format")
-        
-        # Convert the extracted blocks to insertable format
-        insertable_blocks = prepare_blocks_for_insertion(content_blocks)
-        
+        # If we have content, use AI to convert to regular blocks
         if dry_dry_run:
-            print(f"    🌀 DRY-DRY RUN: Would replace synced block with {len(insertable_blocks)} blocks")
-            return insertable_blocks
+            print(f"    🌀 DRY-DRY RUN: Would convert synced block with {len(content_blocks)} children")
+            return {"type": "paragraph", "paragraph": {"rich_text": [{"type": "text", "text": {"content": "[DRY RUN] Converted synced content"}}]}}
         
-        # Replace synced block with the reconstructed blocks
-        if not dry_run:
-            try:
-                # Get parent info before deleting
-                parent_id = synced_block.get('parent', {}).get('page_id') or synced_block.get('parent', {}).get('block_id')
+        # Build content text for AI processing
+        content_texts = []
+        for child_block in content_blocks:
+            child_text = extract_plain_text_from_block(child_block)
+            if child_text.strip():
+                content_texts.append(f"- {child_text.strip()}")
+        
+        if not content_texts:
+            # No text content found, treat as empty
+            print(f"    ⚠️ No text content found in synced block children")
+            empty_paragraph = {
+                "type": "paragraph",
+                "paragraph": {
+                    "rich_text": []
+                }
+            }
+            
+            if not dry_run:
+                # Replace synced block with empty paragraph
+                notion_client.blocks.update(block_id, empty_paragraph)
+                print(f"    ✅ Converted empty synced block to empty paragraph")
+            
+            return empty_paragraph
+        
+        content_summary = "\n".join(content_texts)
+        
+        # Load synced block conversion prompt
+        from notion_writer import load_prompt_from_file
+        conversion_prompt_template = load_prompt_from_file("Synced Block Conversion")
+        
+        if not conversion_prompt_template:
+            # Fallback prompt if not found in prompts.txt
+            conversion_prompt_template = """Convert this synced block content to equivalent regular Notion blocks.
+
+IMPORTANT: Return ONLY a single JSON object representing the main block that should replace the synced block.
+
+Synced block content:
+{content}
+
+Return a JSON block that preserves the content but removes the sync relationship. Choose the most appropriate block type (paragraph, heading_1, heading_2, heading_3, bulleted_list_item, etc.) based on the content.
+
+Example output formats:
+- For simple text: {{"type": "paragraph", "paragraph": {{"rich_text": [{{"type": "text", "text": {{"content": "the text here"}}}}]}}}}
+- For headings: {{"type": "heading_1", "heading_1": {{"rich_text": [{{"type": "text", "text": {{"content": "heading text"}}}}]}}}}
+- For lists: {{"type": "bulleted_list_item", "bulleted_list_item": {{"rich_text": [{{"type": "text", "text": {{"content": "list item text"}}}}]}}}}
+
+Return ONLY the JSON object, no other text."""
+        
+        # Format the prompt
+        full_prompt = conversion_prompt_template.format(
+            content=content_summary
+        )
+        
+        # Get AI response
+        try:
+            ai_response = ai_handler.get_response(full_prompt, max_tokens=2000, temperature=0.3)
+            
+            # Parse JSON response
+            converted_block_data = parse_json_from_response(ai_response)
+            
+            if converted_block_data:
+                print(f"    🤖 AI converted synced block to {converted_block_data.get('type', 'unknown')}")
                 
-                # Delete the synced block
-                notion_client.blocks.delete(block_id)
-                print(f"    🗑️ Deleted synced block {block_id[:8]}")
-                
-                # Insert all the converted blocks
-                if insertable_blocks:
-                    # Debug: log the structure we're trying to insert
-                    print(f"    🔍 About to insert {len(insertable_blocks)} blocks:")
-                    for i, block in enumerate(insertable_blocks):
-                        block_type = block.get('type')
-                        has_children = 'children' in block
-                        children_count = len(block.get('children', []))
-                        print(f"        Block {i}: {block_type}, has_children={has_children}, count={children_count}")
-                        
-                        # Show the actual structure for column_list
-                        if block_type == 'column_list':
-                            print(f"            📋 column_list structure:")
-                            print(f"                block.children exists: {'children' in block}")
-                            print(f"                block.column_list exists: {'column_list' in block}")
-                            if 'column_list' in block:
-                                cl_data = block['column_list']
-                                print(f"                block.column_list.children exists: {'children' in cl_data}")
-                                print(f"                block.column_list content: {list(cl_data.keys())}")
-                    
-                    try:
-                        response = notion_client.blocks.children.append(
-                            block_id=parent_id,
-                            children=insertable_blocks
-                        )
-                    except Exception as api_error:
-                        print(f"    ❌ API Error details: {str(api_error)}")
-                        # Try to get more details from the error
-                        if hasattr(api_error, 'response'):
-                            print(f"    📝 Response text: {api_error.response.text}")
-                        raise
-                    
-                    if response and response.get('results'):
-                        new_block_count = len(response['results'])
-                        print(f"    ✅ Created {new_block_count} replacement blocks")
-                        
-                        # Post-process: look for nested synced blocks that need recursive processing
-                        created_blocks = response['results']
-                        nested_synced_found = 0
-                        
-                        for created_block in created_blocks:
-                            block_text = extract_plain_text_from_block(created_block)
-                            if 'needs recursive processing' in block_text and 'original:' in block_text:
-                                # Extract the original ID from the text
-                                import re
-                                match = re.search(r'original: ([a-f0-9-]+)', block_text)
-                                if match:
-                                    original_id = match.group(1)
-                                    print(f"    🔄 Processing nested synced block: {original_id}")
-                                    nested_synced_found += 1
-                                    
-                                    # Recursively process this nested synced block
-                                    try:
-                                        # Use existing recursive extraction
-                                        temp_writer = NotionWriter()
-                                        temp_writer.client = notion_client
-                                        nested_content_blocks = temp_writer._extract_block_children_recursively(original_id)
-                                        
-                                        if nested_content_blocks:
-                                            print(f"        📦 Found {len(nested_content_blocks)} blocks in nested synced block")
-                                            
-                                            # Convert nested blocks to simple format
-                                            nested_simple_blocks = []
-                                            for nested_block in nested_content_blocks:
-                                                simple_block = convert_to_simple_block(nested_block)
-                                                if simple_block:
-                                                    nested_simple_blocks.append(simple_block)
-                                            
-                                            if nested_simple_blocks:
-                                                print(f"        🔄 Replacing placeholder with {len(nested_simple_blocks)} nested blocks")
-                                                
-                                                # Update the placeholder block with the first nested block
-                                                if nested_simple_blocks[0]:
-                                                    created_block_id = created_block.get('id')
-                                                    first_nested = nested_simple_blocks[0]
-                                                    
-                                                    # Update the placeholder block in-place
-                                                    if not dry_run:
-                                                        update_result = notion_client.blocks.update(
-                                                            block_id=created_block_id,
-                                                            **first_nested
-                                                        )
-                                                        print(f"        ✅ Updated placeholder with {first_nested.get('type', 'unknown')} content")
-                                                    
-                                                    # Insert any additional nested blocks after the first one
-                                                    if len(nested_simple_blocks) > 1:
-                                                        additional_blocks = nested_simple_blocks[1:]
-                                                        if not dry_run:
-                                                            notion_client.blocks.children.append(
-                                                                block_id=parent_id,
-                                                                children=additional_blocks
-                                                            )
-                                                            print(f"        ➕ Added {len(additional_blocks)} additional nested blocks")
-                                        else:
-                                            print(f"        ⚠️ No content found in nested synced block {original_id}")
-                                    except Exception as nested_error:
-                                        print(f"        ❌ Failed to process nested synced block: {nested_error}")
-                        
-                        if nested_synced_found > 0:
-                            print(f"    📋 Note: {nested_synced_found} nested synced blocks need separate processing")
-                        
-                        # Return info about all created blocks for further processing
-                        return {
-                            'type': 'synced_conversion_result',
-                            'created_blocks': response['results'],
-                            'count': new_block_count,
-                            'nested_synced_count': nested_synced_found
-                        }
+                # Update the block in Notion if not dry run
+                if not dry_run:
+                    success = notion_client.blocks.update(block_id, converted_block_data)
+                    if success:
+                        print(f"    ✅ Successfully replaced synced block with {converted_block_data.get('type', 'unknown')}")
+                        return converted_block_data
                     else:
-                        print(f"    ❌ Failed to create replacement blocks")
+                        print(f"    ❌ Failed to update block in Notion")
                         return None
                 else:
-                    print(f"    ⚠️ No blocks to insert after conversion")
-                    return None
-                    
-            except Exception as replacement_error:
-                print(f"    ❌ Failed to replace synced block: {replacement_error}")
+                    print(f"    🌀 DRY RUN: Would replace synced block with {converted_block_data.get('type', 'unknown')}")
+                    return converted_block_data
+            else:
+                print(f"    ❌ AI response could not be parsed as JSON")
                 return None
-        else:
-            print(f"    🌀 DRY RUN: Would replace synced block with {len(insertable_blocks)} blocks")
-            # Return a representative block structure for dry run
-            return {"type": "paragraph", "paragraph": {"rich_text": [{"type": "text", "text": {"content": f"[CONVERTED from synced block - {len(insertable_blocks)} blocks]"}}]}} if insertable_blocks else None
+                
+        except Exception as ai_error:
+            print(f"    ❌ AI conversion failed: {ai_error}")
+            return None
             
     except Exception as e:
         print(f"    ❌ Synced block conversion failed: {e}")
@@ -1261,40 +972,14 @@ def test_whole_page_json_edit(page_id, ai_model='claude', dry_run=True, dry_dry_
             )
             
             if converted_block:
-                if isinstance(converted_block, dict) and converted_block.get('type') == 'synced_conversion_result':
-                    # Handle the new conversion result format
-                    created_blocks = converted_block.get('created_blocks', [])
-                    print(f"    🔄 Adding {len(created_blocks)} newly created blocks back to processing queue")
-                    
-                    # Add each created block to the processing queue for AI enhancement
-                    for new_block in created_blocks:
-                        new_block_id = new_block.get('id')
-                        if new_block_id and new_block_id not in processed_blocks:
-                            # Add to the front of the remaining blocks for immediate processing
-                            remaining_blocks = [b for b in all_blocks if b.get('id') not in processed_blocks and b.get('id') != block_id]
-                            remaining_blocks.insert(0, new_block)  # Process next
-                            all_blocks = [b for b in all_blocks if b.get('id') in processed_blocks] + remaining_blocks
-                            print(f"        📝 Queued block {new_block_id[:8]} for AI processing")
-                    
-                    results_log.append({
-                        'block_id': block_id,
-                        'status': 'synced_converted',
-                        'original_type': 'synced_block',
-                        'new_type': f"converted_to_{len(created_blocks)}_blocks",
-                        'created_blocks': len(created_blocks),
-                        'attempt': 1
-                    })
-                    updates_made += 1
-                else:
-                    # Handle old single block format (backward compatibility)
-                    results_log.append({
-                        'block_id': block_id,
-                        'status': 'synced_converted',
-                        'original_type': 'synced_block',
-                        'new_type': converted_block.get('type', 'unknown'),
-                        'attempt': 1
-                    })
-                    updates_made += 1
+                results_log.append({
+                    'block_id': block_id,
+                    'status': 'synced_converted',
+                    'original_type': 'synced_block',
+                    'new_type': converted_block.get('type', 'unknown'),
+                    'attempt': 1
+                })
+                updates_made += 1
                 print(f"    ✅ Converted synced block to {converted_block.get('type', 'unknown')}")
             else:
                 results_log.append({
@@ -1336,7 +1021,7 @@ def test_whole_page_json_edit(page_id, ai_model='claude', dry_run=True, dry_dry_
             'dry_run': dry_run,
             'dry_dry_run': dry_dry_run,
             'timestamp': timestamp,
-            'limit': limit_blocks
+            'limit': limit
         },
         'summary': {
             'total_blocks': len(all_blocks),

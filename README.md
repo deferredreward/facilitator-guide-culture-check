@@ -3,11 +3,11 @@
 An AI-powered system for enhancing Notion-based facilitator training materials with cultural adaptations, accessibility improvements, and evaluation tools. Features advanced JSON+text processing for perfect formatting preservation.
 
 ## 🎉 **RECENT BREAKTHROUGHS**
+- ✅ **SMS & System Notifications**: Get notified when each page completes with progress updates
+- ✅ **Batch Processing**: Process multiple pages automatically with `--file` parameter
 - ✅ **JSON+Text AI Processing**: Revolutionary approach preserving complex Notion formatting
-- ✅ **Refactored Architecture**: Organized codebase with centralized prompt management
-- ✅ **Unified Block Editor**: Single powerful editor for all enhancement operations
-- ✅ **API Inconsistency Fixes**: Robust handling of Notion API caching issues
-- ✅ **Command Line Flexibility**: Comprehensive flag support for all operations
+- ✅ **Synced Block Detection**: Built-in finder and conversion for synced blocks
+- ✅ **Mixed AI Models**: Use different AI providers for different tasks
 
 ## Overview
 
@@ -51,35 +51,41 @@ The system provides three main functions accessible through the orchestrator:
 
 ### Complete Workflow
 ```bash
-# Run all three enhancements
+# Single page - run all three enhancements
 python orchestrator.py <PAGE_ID> --ai claude
+
+# Batch processing - run multiple pages from file
+python orchestrator.py --file pages.txt --ai claude
 ```
 
 ### Individual Operations
 ```bash
-# Reading level enhancement only
+# Single page operations
 python orchestrator.py <PAGE_ID> --only reading --ai claude
-
-# Cultural suggestions only  
 python orchestrator.py <PAGE_ID> --only culture --ai gemini
-
-# Evaluation questions only
 python orchestrator.py <PAGE_ID> --only questions --ai claude
-
-# Translation to target language
 python orchestrator.py <PAGE_ID> --only translation --target-lang Spanish --ai claude
+
+# Batch operations - NEW!
+python orchestrator.py --file pages.txt --only reading --ai claude
+python orchestrator.py --file pages.txt --only translation --target-lang Indonesian --ai gemini
+python orchestrator.py --file pages.txt --only culture --ai claude --notify-sms
 ```
 
 ### Advanced Options
 ```bash
 # Dry run (no changes)
 python orchestrator.py <PAGE_ID> --dry-run --ai claude
+python orchestrator.py --file pages.txt --dry-run --ai claude
 
-# Limit processing & debug
+# Limit processing & debug (single page only)
 python orchestrator.py <PAGE_ID> --num-blocks 5 --debug --ai claude
 
-# Custom prompts
+# Custom prompts (single page only)
 python orchestrator.py <PAGE_ID> --prompt-from-file custom.txt --section Reading
+
+# Mixed AI models for different tasks
+python orchestrator.py <PAGE_ID> --reading-ai claude --questions-ai gemini --culture-ai openai
 ```
 
 ### Direct Block Editor
@@ -115,19 +121,89 @@ python notion_block_editor.py <PAGE_ID> --ai claude --section Reading --limit 10
 - **Pre/post training application** for knowledge gap identification
 - **Professional language** suitable for diverse learners
 
-## 🚀 **QUICK START - ORCHESTRATOR**
+## 📁 Batch Processing
 
-### **Complete AI Enhancement Workflow**
-```bash
-# Run complete workflow: scrape + questions + culture + reading enhancement
-python orchestrator.py <notion_page_url> --ai claude
-
-# Dry run first (recommended)
-python orchestrator.py <notion_page_url> --ai claude --dry-run
-
-# Use different AI models
-python orchestrator.py <page_id> --ai gemini
+### **File Format**
+Create a text file with page IDs (one per line):
 ```
+# pages.txt - Comments start with #
+25c72d5af2de80ab803dd0f52d3f286b
+https://www.notion.so/page/Another-Page-123abc456def789...
+Some-File-Name-FG-789def123abc456...
+
+# Empty lines and comments are ignored
+```
+
+### **Batch Commands**
+```bash
+# Process all pages in file
+python orchestrator.py --file pages.txt --ai claude
+
+# Batch dry run (recommended first)
+python orchestrator.py --file pages.txt --dry-run --ai claude
+
+# Mixed AI models for batch processing
+python orchestrator.py --file pages.txt --reading-ai claude --culture-ai gemini
+
+# With SMS notifications (requires email setup)
+python orchestrator.py --file pages.txt --ai claude --notify-sms
+
+# With system notifications (requires: pip install plyer)
+python orchestrator.py --file pages.txt --ai claude --notify-system
+
+# Both notification types
+python orchestrator.py --file pages.txt --ai claude --notify-sms --notify-system
+```
+
+### **Batch Limitations**
+- Force refresh (`--force-refresh`) only works with single pages  
+- Synced block checking (`--unsync-blocks`) only works with single pages
+
+## 🔧 Synced Block Support
+
+The orchestrator includes built-in synced block detection and conversion:
+
+```bash
+# Convert synced blocks during processing (single page only)
+python orchestrator.py <PAGE_ID> --unsync-blocks --ai claude
+
+# Find synced blocks across multiple pages
+python find_synced_blocks.py --file pages.txt
+python find_synced_blocks.py <PAGE_ID>
+```
+
+## 📱 Notification System
+
+Stay informed about batch processing progress with real-time notifications:
+
+### **SMS Notifications**
+Get text messages for each page completion:
+```bash
+python orchestrator.py --file pages.txt --ai claude --notify-sms
+```
+
+**Setup Requirements:**
+- Gmail account with app password
+- Environment variables: `EMAIL_ADDRESS`, `EMAIL_APP_PASSWORD`, `NOTIFY_SMS_TO`
+- SMS format: `phone_number@carrier_gateway.com` (e.g., `1234567890@vtext.com` for Verizon)
+
+**Example SMS Messages:**
+- `FG ✅ (1/5) Form-Meaning Enhancement...` (success)
+- `FG ❌ (2/5) FAILED Another Page...` (failure) 
+- `FG Batch Complete 🎉 5/5 success` (batch complete)
+
+### **System Notifications**
+Get desktop notifications:
+```bash
+pip install plyer
+python orchestrator.py --file pages.txt --ai claude --notify-system
+```
+
+**Features:**
+- Windows toast notifications
+- Cross-platform support via plyer
+- Non-intrusive desktop alerts
+- Progress tracking per page
 
 ### **Individual Component Usage**
 ```bash
@@ -171,6 +247,16 @@ python ai_reading_enhancer.py <page_id> --ai claude
    CLAUDE_API_KEY=your_claude_api_key  # Optional
    GEMINI_API_KEY=your_gemini_api_key  # Optional
    OPENAI_API_KEY=your_openai_api_key  # Optional
+   
+   # For SMS notifications (optional)
+   EMAIL_ADDRESS=your_email@gmail.com
+   EMAIL_APP_PASSWORD=your_app_password
+   NOTIFY_SMS_TO=1234567890@vtext.com  # Your carrier's SMS email gateway
+   ```
+
+5. For system notifications (optional):
+   ```bash
+   pip install plyer
    ```
 
 ## 📚 Usage

@@ -268,5 +268,38 @@ Output only your analysis in the specified markdown format – no additional com
 
 
 
+# Synced Block Conversion:
+"""Convert this synced block content to an equivalent regular Notion block.
+
+IMPORTANT: Return ONLY a single JSON object representing the main block that should replace the synced block.
+
+Synced block content:
+{content}
+
+ANALYSIS TASK:
+1. Examine the synced content and determine the most appropriate regular block type
+2. Choose from: paragraph, heading_1, heading_2, heading_3, bulleted_list_item, numbered_list_item, quote, callout, toggle, to_do
+3. Preserve all text content exactly as provided
+4. Convert to proper JSON structure for the chosen block type
+
+CONVERSION RULES:
+- For simple text content → use "paragraph"
+- For title/header content → use appropriate heading level (heading_1, heading_2, heading_3)
+- For list items → use "bulleted_list_item" or "numbered_list_item"  
+- For quoted text → use "quote"
+- For highlighted/important text → use "callout"
+- For expandable sections → use "toggle"
+- For checkbox/task items → use "to_do"
+
+JSON FORMAT EXAMPLES:
+- Paragraph: {{"type": "paragraph", "paragraph": {{"rich_text": [{{"type": "text", "text": {{"content": "the text here"}}}}]}}}}
+- Heading 1: {{"type": "heading_1", "heading_1": {{"rich_text": [{{"type": "text", "text": {{"content": "heading text"}}}}]}}}}
+- Heading 2: {{"type": "heading_2", "heading_2": {{"rich_text": [{{"type": "text", "text": {{"content": "heading text"}}}}]}}}}
+- Bulleted List: {{"type": "bulleted_list_item", "bulleted_list_item": {{"rich_text": [{{"type": "text", "text": {{"content": "list item text"}}}}]}}}}
+- Quote: {{"type": "quote", "quote": {{"rich_text": [{{"type": "text", "text": {{"content": "quoted text"}}}}]}}}}
+- Checkbox: {{"type": "to_do", "to_do": {{"rich_text": [{{"type": "text", "text": {{"content": "checkbox task text"}}}}], "checked": false}}}}
+
+CRITICAL: Return ONLY the JSON object, no explanatory text, no markdown formatting, no additional commentary."""
+
 # Notes:
 Claude's grade level prompt: Your task is to take the text provided and rewrite it in a way that is easy for young learners in grades 3-5 to read and understand. Simplify advanced vocabulary, break down long sentences, explain difficult concepts in plain language, and present the information in a clear, engaging way. The short rewritten text should convey the core ideas of the original text in an age-appropriate manner.

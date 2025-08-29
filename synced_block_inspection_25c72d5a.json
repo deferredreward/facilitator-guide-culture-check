@@ -1,0 +1,34 @@
+{
+  "block_metadata": {
+    "object": "block",
+    "id": "25c72d5a-f2de-8171-ae93-f61df1e22377",
+    "parent": {
+      "type": "block_id",
+      "block_id": "25c72d5a-f2de-8115-9318-e5b1bb26de51"
+    },
+    "created_time": "2025-08-27T15:55:00.000Z",
+    "last_edited_time": "2025-08-27T15:55:00.000Z",
+    "created_by": {
+      "object": "user",
+      "id": "e4ca79c9-b6dc-4549-bc2b-6cb96e6c853c"
+    },
+    "last_edited_by": {
+      "object": "user",
+      "id": "e4ca79c9-b6dc-4549-bc2b-6cb96e6c853c"
+    },
+    "has_children": false,
+    "archived": true,
+    "in_trash": true,
+    "type": "synced_block",
+    "synced_block": {
+      "synced_from": {
+        "type": "block_id",
+        "block_id": "1cf72d5a-f2de-805e-aaa9-f9bd3b33485c"
+      }
+    },
+    "request_id": "67a39623-3922-4795-9236-eab63f0e515b"
+  },
+  "direct_children": [],
+  "original_children": null,
+  "original_children_error": "Could not find block with ID: 1cf72d5a-f2de-805e-aaa9-f9bd3b33485c. Make sure the relevant pages and databases are shared with your integration."
+}
