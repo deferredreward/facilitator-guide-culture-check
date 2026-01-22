@@ -36,6 +36,9 @@ from file_finder import find_markdown_file_by_page_id
 # Load environment variables
 load_dotenv()
 
+# FG Objectives Database ID - only process page mentions from this database
+FG_OBJECTIVES_DB_ID = "20872d5af2de805c9415ee16656cd836"
+
 
 def should_skip_translation(text, target_language, source_language='english'):
     """2-step language detection: check if source OR target language to skip AI"""
@@ -295,14 +298,106 @@ def get_all_blocks_recursively(client, page_id, max_depth=20, debug=False):
     
     return all_blocks
 
+def is_fg_objective_page(client, page_id):
+    """
+    Check if a page belongs to the FG Objectives database
+
+    Args:
+        client: Notion client
+        page_id (str): Page ID to check
+
+    Returns:
+        bool: True if page is from FG Objectives database
+    """
+    try:
+        page_info = client.pages.retrieve(page_id)
+        parent = page_info.get('parent', {})
+
+        if parent.get('type') == 'database_id':
+            database_id = parent.get('database_id', '').replace('-', '')
+            target_db_id = FG_OBJECTIVES_DB_ID.replace('-', '')
+            return database_id == target_db_id
+
+        return False
+    except Exception as e:
+        print(f"    Warning: Could not check if page {page_id[:8]}... is FG Objective: {e}")
+        return False
+
+def update_database_page_title(client, page_id, new_title_text, dry_run=True):
+    """
+    Update the title property of a database page
+
+    Args:
+        client: Notion client
+        page_id (str): Page ID to update
+        new_title_text (str): New title text
+        dry_run (bool): If True, don't actually update
+
+    Returns:
+        bool: True if successful
+    """
+    if dry_run:
+        print(f"    [DRY RUN] Would update database page {page_id[:8]}... title to: {new_title_text[:50]}...")
+        return True
+
+    try:
+        # Get the page to find the title property name
+        page_info = client.pages.retrieve(page_id)
+        properties = page_info.get('properties', {})
+
+        # Find the title property
+        title_prop_name = None
+        for prop_name, prop_data in properties.items():
+            if prop_data.get('type') == 'title':
+                title_prop_name = prop_name
+                break
+
+        if not title_prop_name:
+            print(f"    ERROR: Could not find title property for page {page_id[:8]}...")
+            return False
+
+        # Update the page title
+        client.pages.update(
+            page_id=page_id,
+            properties={
+                title_prop_name: {
+                    'title': [
+                        {
+                            'type': 'text',
+                            'text': {'content': new_title_text}
+                        }
+                    ]
+                }
+            }
+        )
+
+        print(f"    UPDATED database page {page_id[:8]}... title: {new_title_text[:50]}...")
+        return True
+
+    except Exception as e:
+        print(f"    ERROR updating database page title: {e}")
+        return False
+
 def extract_plain_text_from_block(block_data):
     """Extract plain text from block data"""
     block_type = block_data.get('type', '')
     
-    if block_type in ['paragraph', 'heading_1', 'heading_2', 'heading_3', 
+    if block_type in ['paragraph', 'heading_1', 'heading_2', 'heading_3',
                      'bulleted_list_item', 'numbered_list_item', 'quote', 'callout', 'toggle', 'to_do']:
         rich_text = block_data.get(block_type, {}).get('rich_text', [])
-        return ''.join([rt.get('text', {}).get('content', '') for rt in rich_text])
+        # Handle both text and mention types - use plain_text field for mentions
+        text_parts = []
+        for rt in rich_text:
+            rt_type = rt.get('type', 'text')
+            if rt_type == 'text':
+                text_parts.append(rt.get('text', {}).get('content', ''))
+            elif rt_type == 'mention':
+                # For mentions (like page links), use the plain_text field
+                text_parts.append(rt.get('plain_text', ''))
+            else:
+                # For other types, try plain_text as fallback
+                text_parts.append(rt.get('plain_text', ''))
+        return ''.join(text_parts)
     elif block_type == 'image':
         # Extract text from image caption
         caption = block_data.get('image', {}).get('caption', [])
@@ -526,14 +621,32 @@ Return a JSON object with the same structure as the original block, with only th
     print(f"    ⚠ All {max_retries} attempts failed, returning last response")
     return response if 'response' in locals() else "ERROR: No valid response received", max_retries - 1
 
-def process_block_with_ai(block_data, ai_handler, results_log, dry_dry_run=False, prompt_file="prompts.txt", section="Reading", target_language=None, source_language='english', original_page_context="", enhanced_context=""):
-    """Process a single block with AI"""
+def process_block_with_ai(block_data, ai_handler, results_log, dry_dry_run=False, prompt_file="prompts.txt", section="Reading", target_language=None, source_language='english', original_page_context="", enhanced_context="", client=None, dry_run=True):
+    """Process a single block with AI
+
+    Args:
+        block_data: Block data from Notion API
+        ai_handler: AI handler for processing
+        results_log: List to append processing results
+        dry_dry_run: Skip AI processing
+        prompt_file: Path to prompts file
+        section: Section to use from prompts file
+        target_language: Target language for translation
+        source_language: Source language
+        original_page_context: Original page context
+        enhanced_context: Enhanced context from processed blocks
+        client: Notion client (needed for page mention processing)
+        dry_run: If True, don't actually update Notion
+
+    Returns:
+        Updated block data or None
+    """
     block_id = block_data.get('id', 'unknown')
     block_type = block_data.get('type', 'unknown')
-    
+
     # Extract text
     plain_text = extract_plain_text_from_block(block_data)
-    
+
     print(f"  Processing {block_type} block {block_id}...")
     # Make text safe for Windows console
     safe_text = plain_text.encode('ascii', 'replace').decode('ascii')
@@ -640,7 +753,50 @@ def process_block_with_ai(block_data, ai_handler, results_log, dry_dry_run=False
             'changes_made': plain_text != enhanced_text,
             'retry_count': retry_count
         })
-        
+
+        # Check if this block contains page mentions that need to be updated
+        if client and block_type in ['paragraph', 'heading_1', 'heading_2', 'heading_3',
+                                      'bulleted_list_item', 'numbered_list_item', 'quote',
+                                      'callout', 'toggle', 'to_do']:
+            rich_text = block_data.get(block_type, {}).get('rich_text', [])
+
+            # Look for page mentions in the rich_text
+            page_mentions = []
+            for rt in rich_text:
+                if rt.get('type') == 'mention' and rt.get('mention', {}).get('type') == 'page':
+                    page_id = rt.get('mention', {}).get('page', {}).get('id')
+                    if page_id:
+                        page_mentions.append(page_id)
+
+            # If we found page mentions, check if they're from FG Objectives database
+            if page_mentions:
+                print(f"    Found {len(page_mentions)} page mention(s) in block")
+
+                for mention_page_id in page_mentions:
+                    # Check if this page is from the FG Objectives database
+                    if is_fg_objective_page(client, mention_page_id):
+                        print(f"    Page {mention_page_id[:8]}... is an FG Objective - updating database item")
+
+                        # Update the database page title with the enhanced text
+                        success = update_database_page_title(client, mention_page_id, enhanced_text, dry_run)
+
+                        if success:
+                            # Log the database update
+                            results_log.append({
+                                'block_id': mention_page_id,
+                                'status': 'database_page_updated',
+                                'original_text': plain_text,
+                                'enhanced_text': enhanced_text,
+                                'parent_block_id': block_id,
+                                'database_id': FG_OBJECTIVES_DB_ID
+                            })
+                    else:
+                        print(f"    Page {mention_page_id[:8]}... is NOT an FG Objective - skipping")
+
+                # Don't update the paragraph block itself, just return None
+                # The database items have been updated, which is what we want
+                return None
+
         return parsed_json
         
     except Exception as e:
@@ -1312,8 +1468,9 @@ def test_whole_page_json_edit(page_id, ai_model='claude', dry_run=True, dry_dry_
         
         # Process with AI (or skip if dry-dry run)
         updated_block = process_block_with_ai(
-            block, ai_handler, results_log, dry_dry_run, prompt_file, section, 
-            target_language, source_language, original_page_context, enhanced_context
+            block, ai_handler, results_log, dry_dry_run, prompt_file, section,
+            target_language, source_language, original_page_context, enhanced_context,
+            client, dry_run
         )
         
         # Update in Notion if changes were made
