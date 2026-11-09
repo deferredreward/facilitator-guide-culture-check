@@ -207,3 +207,6 @@ cython_debug/
 
 # VSCode settings
 .vscode/
+# Claude Code per-machine permission list: "don't ask again" can save
+# approved commands verbatim, secrets included. Never commit it.
+**/.claude/settings.local.json
